@@ -19,7 +19,11 @@ Flake configuration for NixOS 26.05 ("Yarara"), meant to be installed on several
 ## Layout
 - Needed for installing (on GitHub and the USB stick): `flake.nix`, `flake.lock` (after first install),
   `vars.nix`, `hosts/`, `modules/`, `scripts/`, `README.md`.
-- Not needed for installing: `dev/` (test tools), `CLAUDE.md`, `.gitignore`.
+- Not needed for installing: `dev/` (test tools), `CLAUDE.md`, `.gitignore`, `.githooks/`.
+- **No secrets in the repo (it is public).** Safeguards: `.gitignore` (secret file patterns),
+  `.githooks/pre-commit` (blocks passwords, hashes, private keys, tokens; `allow-secret` comment to allow a line;
+  `--all` scans the tree; enabled via `core.hooksPath`, which fetch-config.sh sets on new machines), and GitHub
+  secret scanning + push protection (enabled on the repo). Real secrets later → sops-nix/agenix, never plain.
 - `flake.nix`: pins nixpkgs `nixos-26.05`, turns every directory in `hosts/` (except `_…`) into a system.
 - `vars.nix`: username (placeholder `changeme`), full name, `repoUrl`, desktop, language, time zone, keyboard.
   Scripts read/write its simple `name = "value";` lines with sed, so keep that format.
@@ -57,7 +61,7 @@ Flake configuration for NixOS 26.05 ("Yarara"), meant to be installed on several
   Firefox 157.0.1, Chrome 155.0.8059.39, Brave 1.96.61, Bitwarden 2026.8.0, VLC 3.0.24, Nix 2.34.8.
   A GNOME VM was started (`system.build.vm`; GNOME autologin needs getty@tty1/autovt@tty1 disabled).
 - `versions.sh` tested against the really built system (`nix-instantiate --raw` was replaced: older Nix lacks it).
-- All scripts and the menu tested with stubs (`dev/test-scripts.sh`, all 8 pass), including the repo check
+- All scripts and the menu tested with stubs (`dev/test-scripts.sh`: 8 menu scenarios + 10 secret-check cases, all pass), including the repo check
   against real GitHub URLs (existing repo → 0, missing repo → curl exit 22).
 - The "attach a local copy to GitHub" flow in README 3.5 (`git fetch` + `git reset --soft origin/main` on an
   unborn branch) was tested with real git.

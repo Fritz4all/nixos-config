@@ -53,7 +53,7 @@ fi
 
 ##### 1. Full installation with 'a' (config copied locally, repo not online) #####
 if [[ -z "${NO_ROOT:-}" ]]; then
-  setup; mounted
+  setup; mounted; set_repo_url ""
   out="$(AS_ROOT=1 run_menu a y "" "" roy "Roy Test" laptop "" n "" q)"
   expect "full installation (local config)" "$out" \
     "Chosen:     Local config" "Saved in" "nixos-install --flake" "Installation of 'laptop' is finished." \
@@ -69,7 +69,7 @@ if [[ -z "${NO_ROOT:-}" ]]; then
 fi
 
 ##### 3. Repo status in the menu #####
-setup
+setup; set_repo_url ""
 out="$(DRY=1 run_menu q)"
 expect "repo status: repoUrl empty" "$out" "not set (repoUrl in vars.nix)"
 set_repo_url "https://github.com/example/nixos-config.git"
@@ -92,6 +92,41 @@ if [[ -z "${NO_ROOT:-}" ]]; then
   setup
   out="$(AS_ROOT=1 run_menu 5 y "" q)"
   expect "install refuses without config" "$out" "the user has not been set up yet" "Step 5 failed or was aborted."
+fi
+
+##### 6. Secret check before commits (.githooks/pre-commit); needs a real git #####
+hook_case() {  # hook_case <description> <expected: block|allow> <file> <content>
+  local name="$1" want="$2" f="$3" rc=0
+  ( cd "$WORK/hookrepo" && git reset -q && mkdir -p "$(dirname "$f")" && printf '%s\n' "$4" > "$f" \
+      && git add -f "$f" && bash .githooks/pre-commit >/dev/null 2>&1 ) || rc=$?
+  rm -rf "$WORK/hookrepo/${f%%/*}"
+  if [[ ( "$want" == block && $rc -ne 0 ) || ( "$want" == allow && $rc -eq 0 ) ]]; then
+    echo "PASS  secret check: $name"; PASS=$((PASS + 1))
+  else
+    echo "FAIL  secret check: $name (expected $want)"; FAIL=$((FAIL + 1))
+  fi
+}
+if command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
+  setup
+  rm -rf "$WORK/hookrepo"; cp -a "$WORK/repo" "$WORK/hookrepo"
+  ( cd "$WORK/hookrepo" && git init -q -b main && git add -A ) >/dev/null
+  if ( cd "$WORK/hookrepo" && bash .githooks/pre-commit --all >/dev/null 2>&1 ); then
+    echo "PASS  secret check: whole repo is clean"; PASS=$((PASS + 1))
+  else
+    echo "FAIL  secret check: whole repo is clean"; FAIL=$((FAIL + 1))
+    ( cd "$WORK/hookrepo" && bash .githooks/pre-commit --all ) | sed 's/^/    /' || true
+  fi
+  hook_case "password in Nix"      block hosts/x.nix 'users.users.roy.initialPassword = "geheim123";'  # fake test data, allow-secret
+  hook_case "password hash"        block hosts/x.nix 'hashedPassword = "$6$rounds=5000$abcdefgh$ijklmnopqrstuv";'  # fake test data, allow-secret
+  hook_case "private key"          block keys/x.txt  '-----BEGIN OPENSSH PRIVATE KEY-----'  # fake test data, allow-secret
+  hook_case "GitHub token"         block hosts/x.sh  'TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789'  # fake test data, allow-secret
+  hook_case "key file name"        block keys/id_ed25519 'anything'
+  hook_case ".env file"            block cfg/.env    'A=1'
+  hook_case "normal change"        allow hosts/x.nix '{ services.printing.enable = true; }'
+  hook_case "password file path"   allow hosts/x.nix 'users.users.roy.hashedPasswordFile = "/run/secrets/roy";'
+  hook_case "allow-secret comment" allow hosts/x.nix 'initialPassword = "test"; # test VM, allow-secret'
+else
+  echo "Note: git not found; the secret check scenarios are skipped."
 fi
 
 echo

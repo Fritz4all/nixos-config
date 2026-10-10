@@ -3,3 +3,19 @@ result
 result-*
 *.qcow2
 .nix-portable/
+
+# Secrets. This repo is public, so these must never be committed (.githooks/pre-commit checks as well).
+.env
+.env.*
+secrets/
+secret/
+*.pem
+*.key
+*.p12
+*.pfx
+*.kdbx
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+*password*

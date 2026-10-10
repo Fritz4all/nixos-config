@@ -9,7 +9,7 @@
     virtualisation.memorySize = 4096;
     virtualisation.cores = 4;
     virtualisation.resolution = { x = 1600; y = 900; };
-    users.users.${vars.username}.initialPassword = "test";
+    users.users.${vars.username}.initialPassword = "test"; # throwaway test VM password, allow-secret
     services.displayManager.autoLogin = { enable = true; user = vars.username; };
     # Needed for automatic login with GNOME
     systemd.services."getty@tty1".enable = false;

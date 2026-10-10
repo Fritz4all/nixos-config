@@ -5,7 +5,7 @@ Everything here works on any Linux machine (for example Ubuntu); NixOS is not ne
 
 | File | What it does |
 |---|---|
-| `test-scripts.sh` | Tests the installation menu and scripts in 8 scenarios (full installation, download vs. local copy, repo status, no internet, warnings). No disk is touched: the installer commands are replaced by the fake versions in `stubs/`. Takes a few seconds. |
+| `test-scripts.sh` | Tests the installation menu and scripts in 8 scenarios (full installation, download vs. local copy, repo status, no internet, warnings), plus 10 cases for the secret check in `.githooks/pre-commit` (needs git). No disk is touched: the installer commands are replaced by the fake versions in `stubs/`. Takes a few seconds. |
 | `demo-menu.sh` | Opens the installation menu in dry-run mode with fake disks, to click through it safely. |
 | `check-config.sh` | Checks that the NixOS configuration evaluates (GNOME and Plasma) and shows the package versions. `--build` builds the complete system (~11 GB download), `--vm` starts a VM with the desktop. Needs Nix or nix-portable (see the top of the script). |
 | `testvm/` | The fake machine used by `check-config.sh`: test hardware, plus automatic login for the VM (user password in the VM: see `testvm/default.nix`). |

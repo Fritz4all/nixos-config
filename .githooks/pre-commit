@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Blocks a commit when it looks like it contains a password, password hash, private key or token.
+# This repo is public: anything committed can be read by everyone, also after deleting it later.
+#
+# Activated with: git config core.hooksPath .githooks   (fetch-config.sh does this on new machines)
+# Check the whole repo instead of the staged changes: bash .githooks/pre-commit --all
+#
+# A line that is really not a secret (e.g. a throwaway password for a test VM) can be allowed by
+# putting the word allow-secret in a comment on that line.
+set -euo pipefail
+
+# Things that look like secrets (extended regex)
+PATTERNS=(
+  '(password|passwd|passphrase|secret|token|api[_-]?key)[[:space:]]*[=:][[:space:]]*"[^"]{3,}'  # password = "…"
+  '\$(1|2[aby]|5|6|7|y|gy)\$[^[:space:]"]{8,}'                    # password hash (mkpasswd)
+  '-----BEGIN [A-Z ]*PRIVATE KEY-----'                             # SSH/TLS/GPG private key
+  '(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}'  # GitHub token
+  'AKIA[0-9A-Z]{16}'                                               # AWS key
+  'sk-[A-Za-z0-9_-]{20,}'                                          # OpenAI/Anthropic-style API key
+  'xox[abprs]-[A-Za-z0-9-]{10,}'                                   # Slack token
+)
+# File names that should never be committed
+BAD_FILES='(^|/)(id_(rsa|dsa|ecdsa|ed25519)|[^/]*\.(pem|key|p12|pfx|kdbx)|\.env(\..*)?|secrets?(/|$)|[^/]*password[^/]*)$'
+
+self=".githooks/pre-commit"
+found=0
+
+report() { echo "  $1"; found=1; }
+
+if [[ "${1:-}" == --all ]]; then
+  files="$(git ls-files)"
+  content() { grep -nIH '' "$1" 2>/dev/null || true; }
+else
+  files="$(git diff --cached --name-only --diff-filter=ACMR)"
+  # Only the added lines of a staged file, as "file:line:text"
+  content() {
+    git diff --cached -U0 --no-color -- "$1" | awk -v f="$1" '
+      /^@@/ { split($3, a, /[+,]/); n = a[2]; next }
+      /^\+\+\+/ { next }
+      /^\+/ { print f ":" n ":" substr($0, 2); n++ }'
+  }
+fi
+
+while IFS= read -r f; do
+  [[ -n "$f" && "$f" != "$self" ]] || continue
+  if [[ "$f" =~ $BAD_FILES ]]; then
+    report "$f: this kind of file usually contains a secret"
+  fi
+  while IFS= read -r line; do
+    [[ "$line" == *allow-secret* ]] && continue
+    for p in "${PATTERNS[@]}"; do
+      if grep -qiE -- "$p" <<<"$line"; then
+        report "$(cut -d: -f1,2 <<<"$line"): looks like a password, key or token"
+        break
+      fi
+    done
+  done < <(content "$f")
+done <<<"$files"
+
+if (( found )); then
+  echo
+  echo "Commit blocked: the lines above look like passwords, keys or tokens."
+  echo "Keep secrets out of this repo (passwords belong in Bitwarden). Remove them and try again."
+  echo "Not a secret after all? Add the comment 'allow-secret' on that line."
+  exit 1
+fi

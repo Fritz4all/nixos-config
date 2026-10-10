@@ -22,7 +22,8 @@ nixos-config/
 │
 ├── dev/             testing tools; on GitHub, but not needed for installing
 ├── CLAUDE.md        notes for the AI assistant (Claude Code); not needed for installing
-└── .gitignore       tells Git which files to leave out (build results, test files)
+├── .githooks/       blocks commits that contain passwords, keys or tokens (see "Keeping secrets out")
+└── .gitignore       tells Git which files to leave out (build results, test files, secret files)
 ```
 
 **Simple rule:** upload the whole folder to GitHub, and copy the whole folder to the USB stick.
@@ -48,6 +49,30 @@ nixos-config/
 | `dev/` | test tools, see [dev/README.md](dev/README.md) |
 
 Shared = everything in `vars.nix` and `modules/`. Different per machine = only its directory in `hosts/`.
+
+---
+
+## Keeping secrets out
+
+This repo is **public**: everyone can read it, and anything that was ever committed stays in the history, even
+after you delete it. So passwords, keys and tokens never go in here. Passwords belong in Bitwarden; your user
+password is set during installation and is not stored in the repo. Three safeguards help:
+
+1. **`.gitignore`** keeps typical secret files out of Git (`.env`, `secrets/`, `*.key`, `*.pem`, `id_ed25519`,
+   files with "password" in the name, …).
+2. **`.githooks/pre-commit`** checks every commit and **blocks** it when something looks like a password
+   (`password = "…"`), a password hash, a private key or a token. It is turned on automatically on new machines
+   (by step 3 of the menu). On a computer where you cloned the repo yourself, turn it on once with:
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+   Check the whole repo at any time with `bash .githooks/pre-commit --all`.
+3. **GitHub push protection** is turned on for the repo: GitHub itself refuses a push that contains a
+   recognisable token or key.
+
+Is something blocked that is really not a secret? Add the comment `allow-secret` on that line.
+Need a real secret in the config one day (e.g. a Wi-Fi password)? Ask for a secrets tool such as sops-nix or
+agenix: those store secrets encrypted, so only your machines can read them.
 
 ---
 
@@ -85,7 +110,11 @@ installer can download it without logging in.
    git commit -m "First version"
    gh repo create nixos-config --public --source=. --push
    ```
-6. **Check.** Open `https://github.com/YOURNAME/nixos-config` in your browser; you should see the files.
+6. **Turn on the secret check** (see "Keeping secrets out"):
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+7. **Check.** Open `https://github.com/YOURNAME/nixos-config` in your browser; you should see the files.
 
 Later changes are uploaded with:
 ```bash

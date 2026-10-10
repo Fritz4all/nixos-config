@@ -254,6 +254,13 @@ do_download() {
   fi
 }
 
+# Turn on the secret check before commits (.githooks/pre-commit) in the new config.
+enable_hooks() {
+  command -v git >/dev/null 2>&1 || return 0
+  [[ -d "$DEST/.githooks" || $DRY_RUN -eq 1 ]] || return 0
+  run git -C "$DEST" config core.hooksPath .githooks || warn "Could not turn on the secret check (.githooks)."
+}
+
 label_of() { if [[ "$1" == download ]]; then echo "Download config"; else echo "Local config"; fi; }
 
 ##### Determine the choice #####
@@ -322,6 +329,7 @@ echo "Continuing with: $(label_of "$MODE")"
 ##### Execute #####
 
 if [[ "$MODE" == download ]]; then do_download; else do_local; fi
+enable_hooks
 
 ROOTPREFIX=""
 [[ "$MNT" == /mnt ]] || ROOTPREFIX="MNT=$MNT "
