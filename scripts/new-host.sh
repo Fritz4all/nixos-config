@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Creates a new machine in this repo: hosts/<hostname>/ with hardware detection and stateVersion.
+# In a virtual machine it also turns on the guest tools for that kind of VM (QEMU/KVM, VMware); NixOS's own
+# hardware detection already handles VirtualBox, Hyper-V and Parallels.
 #
 # Usage: bash scripts/new-host.sh <hostname> [--root /mnt]
 #   --root  where the new system is mounted (default /mnt, as in the installer)
@@ -64,6 +66,27 @@ sed "s/@STATE_VERSION@/$STATE_VERSION/" "$REPO/hosts/_template/default.nix" > "$
 
 echo "Detecting hardware (system mounted on $ROOT) ..."
 nixos-generate-config --root "$ROOT" --show-hardware-config > "$DEST/hardware-configuration.nix"
+
+# Virtual machine? Then add the guest tools for that kind of VM to this machine's settings.
+VIRT="$(systemd-detect-virt --vm 2>/dev/null || true)"
+GUEST=""
+case "$VIRT" in
+  kvm|qemu|bochs)
+    GUEST="  services.qemuGuest.enable = true;       # lets the VM host shut this machine down cleanly
+  services.spice-vdagentd.enable = true;  # shared clipboard; the screen size follows the window" ;;
+  vmware)
+    GUEST="  virtualisation.vmware.guest.enable = true;  # open-vm-tools: clipboard, screen size, drag and drop" ;;
+esac
+if [[ -n "$GUEST" ]]; then
+  # Insert the block before the final closing brace of default.nix
+  { sed '$d' "$DEST/default.nix"
+    printf '\n  # Virtual machine (%s): guest tools, added by new-host.sh during installation.\n%s\n}\n' "$VIRT" "$GUEST"
+  } > "$DEST/default.nix.new"
+  mv "$DEST/default.nix.new" "$DEST/default.nix"
+  echo "Virtual machine detected ($VIRT): guest tools are turned on for this machine."
+elif [[ -n "$VIRT" && "$VIRT" != none ]]; then
+  echo "Virtual machine detected ($VIRT): NixOS's hardware detection takes care of the guest tools."
+fi
 
 trap - ERR
 

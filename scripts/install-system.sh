@@ -137,6 +137,10 @@ echo "  Desktop:        ${DESKTOP:-unknown}${APPS:+ ($APPS)}"
 echo "  NixOS release:  $(sed -n 's/.*inputs\.nixpkgs\.url.*nixos-\([^"]*\)".*/\1/p' "$CFG/flake.nix" | head -n 1)"
 echo "  Config:         $CFG"
 echo "  Target system:  $MNT"
+VIRT="$(systemd-detect-virt --vm 2>/dev/null || true)"
+if [[ -n "$VIRT" && "$VIRT" != none ]]; then
+  echo "  Virtual machine: $VIRT (guest tools are turned on)"
+fi
 echo
 read -rp "Continue with the installation? [Y/n]: " go
 [[ "$go" =~ ^[nN] ]] && { echo "Stopped, nothing was installed."; exit 0; }
