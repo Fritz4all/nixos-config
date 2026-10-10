@@ -9,6 +9,28 @@ Installing a machine comes down to: boot the NixOS installer, get this folder, r
 
 ---
 
+## Contents
+
+- [What is in this folder](#what-is-in-this-folder)
+- [Keeping secrets out](#keeping-secrets-out)
+- [Part 1: Put the config on a USB stick](#part-1-put-the-config-on-a-usb-stick)
+- [Part 2: Install a machine](#part-2-install-a-machine)
+  - [2.1 Make the installer USB stick and start from it](#21-make-the-installer-usb-stick-and-start-from-it)
+  - [2.2 Internet and terminal](#22-internet-and-terminal)
+  - [2.3 Start the installation menu](#23-start-the-installation-menu)
+  - [2.4 The installation menu](#24-the-installation-menu)
+  - [2.5 Optional: save the new machine to GitHub](#25-optional-save-the-new-machine-to-github)
+- [Adding another machine](#adding-another-machine)
+- [Desktop: GNOME or KDE Plasma, Full or Minimal](#desktop-gnome-or-kde-plasma-full-or-minimal)
+- [Daily use](#daily-use)
+- [New NixOS releases](#new-nixos-releases)
+- [Troubleshooting](#troubleshooting)
+- [Details](#details)
+  - [Using the scripts without the menu](#using-the-scripts-without-the-menu)
+  - [Partitioning by hand](#partitioning-by-hand)
+
+---
+
 ## What is in this folder
 
 ```
@@ -281,6 +303,9 @@ Your own apps (Firefox, Chrome, …) stay the same. The settings of each desktop
 | `versions` | show the versions of NixOS, kernel, desktop and your programs |
 | `nixos-release` | show or change the NixOS release (see "New NixOS releases") |
 | `sudo nixos-rebuild switch --rollback` | go back to the previous version |
+| `nixos-rebuild list-generations` | list all versions (generations) of the system, with their date; the current one is marked |
+| `nix-shell -p gimp` | use a program temporarily (here GIMP) in this terminal; gone after `exit` or closing the terminal, nothing is installed |
+| `nix-collect-garbage` | remove downloads that nothing uses any more (e.g. from `nix-shell`); your system and its generations stay |
 
 These are real commands (in `modules/commands/`): they work with and without `sudo` and ask for your password
 when needed. They build as the owner of `/etc/nixos` and only use administrator rights to activate.
