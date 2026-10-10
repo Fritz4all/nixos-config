@@ -217,7 +217,7 @@ echo "Installation of '$NAME' is finished."
 echo
 echo "Next steps:"
 echo "  1. Remove the USB stick and reboot."
-echo "  2. After the first boot: commit and push the new machine (see README, 2.5)."
+echo "  2. Optional: save the new machine to GitHub (see README, 2.5)."
 echo "  3. You can view the versions again later with: versions"
 echo
 read -rp "Reboot now? [y/N]: " rb

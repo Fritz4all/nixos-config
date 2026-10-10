@@ -191,8 +191,19 @@ If the installation fails halfway (e.g. a network error), choose step 5 again an
 name. If you repartitioned the disk, choose **2 (Recreate)**; the script stops by itself when the hardware
 configuration does not match the mounted disk.
 
-### 2.5 After the first start: save the new machine to GitHub
-The installation created `hosts/<name>/` and `flake.lock`. Save them, so other machines get the same versions.
+### 2.5 Optional: save the new machine to GitHub
+**Not needed for the machine to work.** Your new NixOS runs fine without this step. Do it when you want one of
+these:
+
+- **The same versions on your next machines:** the installation created `flake.lock` with the exact versions;
+  without it, each new machine simply gets the newest versions at that moment.
+- **A backup of this machine's own settings** in `hosts/<name>/` (e.g. an extra program or another desktop);
+  without it, a reinstallation just creates that directory again.
+- **Changes you make on this machine** (in `/etc/nixos`) **shared with your other machines** via `git pull`.
+
+If you only change the config elsewhere and push it to GitHub, you can skip this. Note: if you do change files in
+`/etc/nixos` without pushing them, a later `git pull` may ask you to choose between your version and GitHub's.
+
 The installer has made you the owner of `/etc/nixos`, so you can edit it without `sudo`.
 In a terminal, logged in as yourself:
 
@@ -226,7 +237,7 @@ From now on you change the config in `/etc/nixos` and apply it with `rebuild`.
 
 ## Adding another machine
 
-Same recipe as Part 2, with a **new, unique name** in step 5 (e.g. `workpc`). Then save it (2.5).
+Same recipe as Part 2, with a **new, unique name** in step 5 (e.g. `workpc`). Optionally save it (2.5).
 Tip: first update the versions on an existing machine, so the new machine gets fresh packages
 (see "Google Chrome cannot be downloaded" below):
 ```bash
