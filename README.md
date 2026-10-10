@@ -1,7 +1,7 @@
 # NixOS configuration (flake) for all my machines
 
-One repo for all machines: GNOME or KDE Plasma as the desktop (chosen during installation, switching later is
-one line), with Firefox, Google Chrome, Brave, Bitwarden and VLC. The NixOS release is chosen during installation
+One repo for all machines: GNOME or KDE Plasma as the desktop, each in a Full or a Minimal version (chosen
+during installation, switching later is one line), with Firefox, Google Chrome, Brave, Bitwarden and VLC. The NixOS release is chosen during installation
 from the releases that are available at that moment, and can be changed later with one command (`nixos-release`).
 
 Installing a machine comes down to: boot the NixOS installer, get this folder, run
@@ -26,16 +26,14 @@ nixos-config/
 └── .gitignore       tells Git which files to leave out (build results, test files, secret files)
 ```
 
-**Simple rule:** copy the whole folder to the USB stick. On your own computer the folder also has `dev/`
-(test tools) and `CLAUDE.md` (notes for the AI assistant). They are not on GitHub and not needed for installing;
-copying them to the USB stick does no harm.
+Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 
 | Part | What it is |
 |---|---|
-| `vars.nix` | your choices: username, desktop, language, time zone, keyboard, GitHub address (`repoUrl`) |
+| `vars.nix` | your choices: username, desktop and its apps (Full/Minimal), language, time zone, keyboard, GitHub address (`repoUrl`) |
 | `modules/common.nix` | basics for every machine: boot, network, sound, printing, Bluetooth, user, basic programs |
 | `modules/apps.nix` | Firefox, Chrome, Brave, Bitwarden, VLC |
-| `modules/desktop/` | `gnome.nix` and `plasma.nix`; chosen in `vars.nix` |
+| `modules/desktop/` | `gnome.nix` and `plasma.nix`, each in a Full and a Minimal version; chosen in `vars.nix` |
 | `hosts/_template/` | template for a new machine |
 | `hosts/<name>/` | one directory per machine (created by the installer): its hardware and `stateVersion` |
 | `flake.nix` | sets the NixOS release and turns every directory in `hosts/` into a machine automatically |
@@ -43,7 +41,7 @@ copying them to the USB stick does no harm.
 | `scripts/menu.sh` | the installation menu; runs the scripts below in the right order |
 | `scripts/prepare-disk.sh` | choose, partition, encrypt and mount the disk |
 | `scripts/fetch-config.sh` | put the config on the new disk: download from GitHub, or copy locally |
-| `scripts/setup-user.sh` | ask for your username, full name, desktop and NixOS release |
+| `scripts/setup-user.sh` | ask for your username, full name, desktop, Full/Minimal apps and NixOS release |
 | `scripts/release.sh` | show the available NixOS releases and choose one (later also as the command `nixos-release`) |
 | `scripts/install.sh` | ask for the machine name, run `nixos-install`, set your password, show the versions |
 | `scripts/new-host.sh` | create `hosts/<name>/` (used by `install.sh`) |
@@ -79,51 +77,69 @@ agenix: those store secrets encrypted, so only your machines can read them.
 
 ## Part 1: Put the config on a USB stick
 
-Only needed when the computer you install on has no internet. With internet, the config is downloaded
-from GitHub (see 2.3 B). How the repo was put on GitHub: [docs/github-setup.md](docs/github-setup.md).
+Only needed when the computer you install on has no internet. With internet, the menu downloads the config
+from GitHub by itself (see 2.3 B).
 
 You need **two USB sticks**: one for the NixOS installer (writing the installer erases that stick and makes it
 read-only), and one for the config. Any stick will do for the config; it only needs a few hundred kilobytes.
 
-1. Plug in the config stick on your current computer.
-2. Open the file manager (Files), go to `Documents/Claude` and drag the whole `nixos-config` folder onto the stick.
+1. On any computer, open <https://github.com/Fritz4all/nixos-config>, click the green **Code** button and choose
+   **Download ZIP** (or download <https://github.com/Fritz4all/nixos-config/archive/refs/heads/main.zip> directly).
+2. Plug in the config stick and extract the ZIP onto it. You get a folder `nixos-config-main` on the stick;
+   leave the name as it is.
 3. Eject the stick safely (the eject icon in the file manager).
 
 ---
 
 ## Part 2: Install a machine
 
-### 2.1 Make the installer USB stick
-Download the **Graphical ISO** of the newest NixOS release from <https://nixos.org/download> and write it to a USB stick
-(e.g. with balenaEtcher). Turn **Secure Boot off** in the BIOS: this config uses systemd-boot without Secure Boot.
-Start the computer from the stick (usually F12, F2 or Esc during startup) and choose the stick under UEFI.
+### 2.1 Make the installer USB stick and start from it
+Download the **Graphical ISO** of the newest NixOS release from <https://nixos.org/download> and write it to a
+USB stick (e.g. with balenaEtcher). This config uses systemd-boot without Secure Boot, so turn **Secure Boot off**
+in the BIOS/UEFI settings first.
+
+Then plug in the stick, switch the computer on and **tap the boot menu key** right away (several times) until a
+menu appears, and choose the USB stick (the entry that says **UEFI**). Usual keys:
+
+| Brand | Boot menu | BIOS/UEFI settings (Secure Boot) |
+|---|---|---|
+| Acer | F12 (first enable "F12 Boot Menu" in the BIOS) | F2 or Del |
+| ASUS | Esc (laptops), F8 (desktops) | F2 or Del |
+| Dell | F12 | F2 |
+| Gigabyte / AORUS | F12 | Del |
+| HP | Esc, then F9 | Esc, then F10 |
+| Lenovo ThinkPad | F12 (or Enter, then F12) | F1 (or Enter, then F1) |
+| Lenovo IdeaPad / Yoga | F12, or the small Novo button | F2 (or Fn+F2), or the Novo button |
+| MSI | F11 | Del |
+| Microsoft Surface | hold Volume Down while pressing Power | hold Volume Up while pressing Power |
+| Other / unknown | Esc, F12, F11, F10, F9 or F8 | F2 or Del |
+
+Keys differ per model; the startup screen often shows the right one. Nothing happens? On laptops you may need to
+hold **Fn** with the key; use a wired keyboard; or from Windows: hold **Shift** while clicking **Restart**, then
+Troubleshoot → Advanced options → UEFI Firmware Settings.
 
 ### 2.2 Internet and terminal
 In the live environment, pick your Wi-Fi network at the top right (or plug in a network cable).
 Installing downloads packages, so it needs internet. Then open a terminal (Console).
 
-### 2.3 Get the config folder
-Choose **one** of the two ways.
+### 2.3 Start the installation menu
+Choose **one** of the two ways. The menu asks for administrator rights by itself.
 
-**A. From the USB stick.** Plug in the config stick and click it once in the file manager (Files), so it is
-mounted. Then, in the terminal:
+**A. Straight from the config USB stick** (Part 1). Plug in the stick and click it once in the file manager
+(Files), so it is mounted. Then, in the terminal:
 ```bash
-sudo -i
-cp -r /run/media/nixos/*/nixos-config /root/
+bash /run/media/nixos/*/nixos-config*/scripts/menu.sh
 ```
+Leave the stick in until step 3 of the menu is done (the config is then copied to the new disk). The stick
+cannot be chosen as the installation disk by accident: the menu shows it as "in use".
 
 **B. From GitHub** (needs internet, no Git needed):
 ```bash
-sudo -i
-curl -L https://github.com/Fritz4all/nixos-config/archive/refs/heads/main.tar.gz | tar xz -C /root
-mv /root/nixos-config-main /root/nixos-config
+curl -L https://github.com/Fritz4all/nixos-config/archive/refs/heads/main.tar.gz | tar xz -C /tmp
+bash /tmp/nixos-config-main/scripts/menu.sh
 ```
 
-### 2.4 Run the installation menu
-```bash
-bash /root/nixos-config/scripts/menu.sh
-```
-
+### 2.4 The installation menu
 The menu shows all steps. Steps that are done get a ✔, and ▶ points to the next step.
 
 ```
@@ -163,7 +179,7 @@ What each step does:
 | 1. Internet connection | Checks internet and whether your repo can be downloaded (the **Repo** line). No internet? It offers to set up Wi-Fi with `nmtui`. |
 | 2. Prepare disk | Lists the disks (number, size, SSD/HDD, connection, model). The USB stick you booted from cannot be chosen. You type the disk's name to confirm, choose encryption (recommended, default yes) and type a passphrase twice. Creates an EFI partition of 1 GiB and a system partition with the rest, and mounts them on `/mnt`. **Everything on that disk is erased.** |
 | 3. Fetch config | Puts the config in `/mnt/etc/nixos`. **Download config** (git clone from GitHub) when the repo can be downloaded, otherwise **Local config** (a copy of the folder from 2.3). It always says which one and why, and you can override it (`1` or `2`). |
-| 4. Settings | Asks for your username, full name, **desktop** (1 = GNOME, 2 = KDE Plasma) and **NixOS release**. The releases are looked up online, so new releases appear by themselves; the newest stable one is marked as recommended, and `unstable` is offered for the newest software. Enter keeps the current value each time. |
+| 4. Settings | Asks for your username, full name, **desktop** (1 = GNOME, 2 = KDE Plasma), the **apps** that come with it (1 = Full, 2 = Minimal; see below) and the **NixOS release**. The releases are looked up online, so new releases appear by themselves; the newest stable one is marked as recommended, and `unstable` is offered for the newest software. Enter keeps the current value each time. |
 | 5. Install | Asks for the machine name (e.g. `laptop`), detects the hardware, runs `nixos-install` (10 to 30 minutes), asks for a root password and your user password, and shows the versions. |
 | 6. Show versions | Shows the versions again: NixOS, kernel, systemd, desktop, Firefox, Chrome, Brave, Bitwarden, VLC. |
 | 7. Reboot | Remove the USB sticks. With encryption you first type the passphrase, then the login screen appears. |
@@ -219,18 +235,27 @@ On the other machines: `cd /etc/nixos && git pull && rebuild`.
 
 ---
 
-## Switching the desktop: GNOME and KDE Plasma
+## Desktop: GNOME or KDE Plasma, Full or Minimal
 
-1. For all machines: set `desktop = "plasma";` in `vars.nix`.
-   For one machine: add `my.desktop = "plasma";` to `hosts/<name>/default.nix`.
+Firefox, Google Chrome, Brave, Bitwarden and VLC are always installed. On top of that, each desktop comes in
+two versions (chosen in step 4 of the menu):
+
+| | Full (the desktop's usual set of apps) | Minimal (only what you need to work) |
+|---|---|---|
+| **GNOME** | Files, Terminal, Text Editor, System Monitor, Disks, Calculator, Image Viewer, Document Viewer, plus Calendar, Contacts, Maps, Weather, Clocks, Music, Video Player, Camera, Document Scanner, Characters, Fonts, Logs, Disk Usage, Help and more | Files, Terminal, Text Editor, System Monitor, Disks, Calculator, Image Viewer, Document Viewer (PDF) |
+| **KDE Plasma** | Dolphin, Konsole, Kate, Gwenview, Okular, Ark, Spectacle, System Settings, System Monitor, plus Elisa (music), Discover (app store), Help, remote desktop, QR scanner, browser add-on | Dolphin (files), Konsole (terminal), Kate (text editor), Gwenview (images), Okular (PDF), Ark (archives), Spectacle (screenshots), System Settings, System Monitor |
+
+To switch later:
+
+1. For all machines: set `desktop = "plasma";` (or `"gnome"`) and/or `desktopApps = "minimal";` (or `"full"`)
+   in `vars.nix`. For one machine: add `my.desktop = "plasma";` and/or `my.desktopApps = "minimal";` to
+   `hosts/<name>/default.nix`.
 2. Apply and reboot (`boot` is safer than `switch` when the login manager changes):
    ```bash
    rebuild-boot
    reboot
    ```
-3. Back to GNOME: the same steps with `"gnome"`.
-
-Your apps stay the same. The settings of each desktop are stored separately in your home folder.
+Your own apps (Firefox, Chrome, …) stay the same. The settings of each desktop are stored separately in your home folder.
 
 ---
 

@@ -16,6 +16,10 @@
   # with `my.desktop = "plasma";`. Then rebuild and reboot.
   desktop = "gnome";
 
+  # Which apps come with the desktop: "full" (the desktop's usual set of apps) or "minimal" (only what you
+  # need to work: files, terminal, text editor, ...). Per machine: `my.desktopApps = "minimal";`.
+  desktopApps = "full";
+
   # Time, language and region
   timeZone = "Europe/Amsterdam";
   locale = "en_US.UTF-8";          # interface language; set to "nl_NL.UTF-8" for Dutch

@@ -63,6 +63,7 @@ read_var() {
 
 USERNAME="$(read_var username)"
 DESKTOP="$(read_var desktop)"
+APPS="$(read_var desktopApps)"
 if [[ -z "$USERNAME" ]]; then
   read -rp "What is the username from vars.nix? " USERNAME
   [[ -n "$USERNAME" ]] || die "No username."
@@ -132,7 +133,7 @@ echo
 echo "Overview"
 echo "  Machine:        $NAME"
 echo "  User:           $USERNAME"
-echo "  Desktop:        ${DESKTOP:-unknown}"
+echo "  Desktop:        ${DESKTOP:-unknown}${APPS:+ ($APPS)}"
 echo "  NixOS release:  $(sed -n 's/.*inputs\.nixpkgs\.url.*nixos-\([^"]*\)".*/\1/p' "$CFG/flake.nix" | head -n 1)"
 echo "  Config:         $CFG"
 echo "  Target system:  $MNT"

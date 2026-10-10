@@ -4,7 +4,7 @@
 #   1. Internet connection   (set up Wi-Fi if needed; also checks whether the repo can be downloaded)
 #   2. Prepare disk          prepare-disk.sh
 #   3. Fetch config          fetch-config.sh
-#   4. Settings              setup-user.sh (username, desktop, NixOS release)
+#   4. Settings              setup-user.sh (username, desktop, Full or Minimal apps, NixOS release)
 #   5. Install               install.sh (machine name, nixos-install, password, versions)
 #   6. Show versions         versions.sh
 #   7. Reboot
@@ -221,7 +221,7 @@ detail() {  # short note next to a step
          echo "mounted on $MNT${src:+ ($src)}"
        fi ;;
     3) st_config && echo "in $CFG" ;;
-    4) st_config && st_user && echo "$(var_of username) · $(desk_name "$(var_of desktop)") · NixOS $(release_of)" ;;
+    4) st_config && st_user && echo "$(var_of username) · $(desk_name "$(var_of desktop)") ($(var_of desktopApps)) · NixOS $(release_of)" ;;
     5) if st_installed; then
          for d in "$CFG"/hosts/*/; do
            [[ -d "$d" ]] && [[ "$(basename "$d")" != _* ]] && hosts+=("$(basename "$d")")

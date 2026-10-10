@@ -58,7 +58,7 @@
   ##### Hardware and maintenance #####
   hardware.enableRedistributableFirmware = lib.mkDefault true;
   hardware.bluetooth.enable = true;
-  services.fwupd.enable = true;   # firmware updates (via GNOME Software / Discover)
+  services.fwupd.enable = true;   # firmware updates (command: fwupdmgr update)
   services.fstrim.enable = true;  # maintenance for SSDs
   zramSwap.enable = true;         # compressed swap in memory
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Asks for the settings of the installation and writes them to the config in <MNT>/etc/nixos
-# (default /mnt/etc/nixos): username, full name and desktop (vars.nix), and the NixOS release
+# (default /mnt/etc/nixos): username, full name, desktop and its apps (vars.nix), and the NixOS release
 # (flake.nix, via release.sh). Then it continues with the installation (install.sh).
 #
 # The current value is the default answer: press Enter to keep it.
@@ -10,6 +10,7 @@
 #   --user NAME        username without asking
 #   --fullname NAME    full name without asking
 #   --desktop NAME     gnome or plasma, without asking
+#   --apps SET         full or minimal (apps that come with the desktop), without asking
 #   --release RELEASE  NixOS release without asking (format YY.MM, or unstable)
 #   --no-continue      only change vars.nix, do not continue to install.sh
 #   --dry-run          only show what would happen
@@ -20,6 +21,7 @@ MNT="${MNT:-/mnt}"
 USER_ARG=""
 FULL_ARG=""
 DESK_ARG=""
+APPS_ARG=""
 REL_ARG=""
 CONTINUE=1
 DRY_RUN=0
@@ -34,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --user)        USER_ARG="${2:?--user needs a value}"; shift 2 ;;
     --fullname)    FULL_ARG="${2:?--fullname needs a value}"; shift 2 ;;
     --desktop)     DESK_ARG="${2:?--desktop needs gnome or plasma}"; shift 2 ;;
+    --apps)        APPS_ARG="${2:?--apps needs full or minimal}"; shift 2 ;;
     --release)     REL_ARG="${2:?--release needs a release}"; shift 2 ;;
     --no-continue) CONTINUE=0; shift ;;
     --dry-run)     DRY_RUN=1; shift ;;
@@ -55,6 +58,7 @@ current() {
 CUR_USER="$(current username)"
 CUR_FULL="$(current fullName)"
 CUR_DESK="$(current desktop)"
+CUR_APPS="$(current desktopApps)"
 
 valid_user() { [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,30}$ && "$1" != root ]]; }
 valid_full() { [[ -n "$1" && "$1" != *\"* && "$1" != *\\* && "$1" != *\$* ]]; }
@@ -121,6 +125,41 @@ else
   done
 fi
 
+##### Desktop apps #####
+
+apps_name() { case "$1" in full) echo "Full" ;; minimal) echo "Minimal" ;; *) echo "$1" ;; esac; }
+
+APPS="$APPS_ARG"
+if [[ -n "$APPS" ]]; then
+  [[ "$APPS" == full || "$APPS" == minimal ]] || die "--apps must be full or minimal."
+else
+  [[ "$CUR_APPS" == full || "$CUR_APPS" == minimal ]] || CUR_APPS=full
+  echo
+  echo "Apps that come with $(desk_name "$DESKTOP") (Firefox, Chrome, Brave, Bitwarden and VLC are always installed):"
+  if [[ "$DESKTOP" == gnome ]]; then
+    echo "  1) Full     GNOME's usual set: Files, Terminal, Text Editor, System Monitor, Disks, Calculator,"
+    echo "              Image Viewer, Document Viewer, plus Calendar, Contacts, Maps, Weather, Clocks, Music,"
+    echo "              Video player, Camera, Document Scanner, Characters, Fonts, Logs, Disk Usage, Help, ..."
+    echo "  2) Minimal  only what you need to work: Files, Terminal, Text Editor, System Monitor, Disks,"
+    echo "              Calculator, Image Viewer, Document Viewer (PDF)"
+  else
+    echo "  1) Full     Plasma's usual set: Dolphin (files), Konsole (terminal), Kate (text editor), Gwenview"
+    echo "              (images), Okular (PDF), Ark (archives), Spectacle (screenshots), System Monitor,"
+    echo "              plus Elisa (music), Discover (app store), Help, remote desktop, QR scanner, browser add-on"
+    echo "  2) Minimal  only what you need to work: Dolphin, Konsole, Kate, Gwenview, Okular, Ark, Spectacle,"
+    echo "              System Settings, System Monitor"
+  fi
+  while true; do
+    prompt "Choose 1 or 2 [$(apps_name "$CUR_APPS")]: "
+    case "$REPLY" in
+      "") APPS="$CUR_APPS"; break ;;
+      1|full|Full) APPS=full; break ;;
+      2|minimal|Minimal) APPS=minimal; break ;;
+      *) echo "Invalid choice." ;;
+    esac
+  done
+fi
+
 ##### Save #####
 
 # Make values safe for the replacement text of sed
@@ -137,9 +176,10 @@ set_var() {  # $1 = name, $2 = value
 set_var username "$USERNAME"
 set_var fullName "$FULLNAME"
 set_var desktop "$DESKTOP"
+set_var desktopApps "$APPS"
 
 if (( ! DRY_RUN )); then
-  [[ "$(current username)" == "$USERNAME" && "$(current fullName)" == "$FULLNAME" && "$(current desktop)" == "$DESKTOP" ]] \
+  [[ "$(current username)" == "$USERNAME" && "$(current fullName)" == "$FULLNAME" && "$(current desktop)" == "$DESKTOP" && "$(current desktopApps)" == "$APPS" ]] \
     || die "Saving to $VARS failed. Edit it by hand."
   if command -v nix-instantiate >/dev/null 2>&1; then
     nix-instantiate --parse "$VARS" >/dev/null 2>&1 || die "$VARS is no longer valid Nix after the change. Check the file."
@@ -153,7 +193,7 @@ echo
 if (( DRY_RUN )); then echo "Dry run: this would be written to $VARS:"; else echo "Saved in $VARS:"; fi
 echo "  Username:   $USERNAME"
 echo "  Full name:  $FULLNAME"
-echo "  Desktop:    $(desk_name "$DESKTOP")"
+echo "  Desktop:    $(desk_name "$DESKTOP") ($(apps_name "$APPS"))"
 echo "Language, time zone and keyboard can be changed in the same file, if you like."
 
 ##### NixOS release #####
