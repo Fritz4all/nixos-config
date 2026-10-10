@@ -109,5 +109,6 @@
     rebuild-boot = "sudo nixos-rebuild boot --flake /etc/nixos";
     nixup = "nix flake update --flake /etc/nixos && sudo nixos-rebuild switch --flake /etc/nixos";
     versions = "bash /etc/nixos/scripts/versions.sh";
+    nixos-release = "bash /etc/nixos/scripts/release.sh";  # show or change the NixOS release
   };
 }

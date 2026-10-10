@@ -1,8 +1,9 @@
 {
   description = "My NixOS configuration for all my machines";
 
-  # Stable release 26.05 "Yarara". Upgrading to a new release = change this line
-  # (e.g. nixos-26.11) and then run `nix flake update`.
+  # The NixOS release this config uses (nixos-YY.MM, or nixos-unstable).
+  # Choose or change it with scripts/release.sh (on an installed machine: the command nixos-release);
+  # that script edits this line, so keep its format.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
   outputs = { self, nixpkgs }:

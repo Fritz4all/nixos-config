@@ -49,7 +49,7 @@ version_of() {
 
 row() { printf '  %-22s %s\n' "$1" "${2:-not found}"; }
 
-# NixOS version from the name of the system, e.g. nixos-system-laptop-26.05.20260610.abc123
+# NixOS version from the name of the system, e.g. nixos-system-laptop-YY.MM.YYYYMMDD.abc1234
 nixos_ver="$(printf '%s\n' "${NAMES[@]}" | grep -E '^nixos-system-.*-[0-9]{2}\.[0-9]{2}\.' | head -n 1 \
   | sed -E 's/^nixos-system-.*-([0-9]{2}\.[0-9]{2}\..*)$/\1/' || true)"
 

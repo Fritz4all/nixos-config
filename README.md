@@ -1,7 +1,8 @@
 # NixOS configuration (flake) for all my machines
 
-One repo for all machines: GNOME as the desktop (switching to KDE Plasma is one line), with Firefox,
-Google Chrome, Brave, Bitwarden and VLC. Based on NixOS 26.05 "Yarara".
+One repo for all machines: GNOME or KDE Plasma as the desktop (chosen during installation, switching later is
+one line), with Firefox, Google Chrome, Brave, Bitwarden and VLC. The NixOS release is chosen during installation
+from the releases that are available at that moment, and can be changed later with one command (`nixos-release`).
 
 Installing a machine comes down to: boot the NixOS installer, get this folder, run
 `bash scripts/menu.sh` and follow the menu.
@@ -21,13 +22,13 @@ nixos-config/
 ├── scripts/         ┘
 │
 ├── docs/            extra manuals (e.g. how the repo was put on GitHub); not needed for installing
-├── CLAUDE.md        notes for the AI assistant (Claude Code); not needed for installing
 ├── .githooks/       blocks commits that contain passwords, keys or tokens (see "Keeping secrets out")
 └── .gitignore       tells Git which files to leave out (build results, test files, secret files)
 ```
 
-**Simple rule:** upload the whole folder to GitHub, and copy the whole folder to the USB stick.
-`docs/` and `CLAUDE.md` are small and harmless; you may leave them off the USB stick if you like.
+**Simple rule:** copy the whole folder to the USB stick. On your own computer the folder also has `dev/`
+(test tools) and `CLAUDE.md` (notes for the AI assistant). They are not on GitHub and not needed for installing;
+copying them to the USB stick does no harm.
 
 | Part | What it is |
 |---|---|
@@ -37,12 +38,13 @@ nixos-config/
 | `modules/desktop/` | `gnome.nix` and `plasma.nix`; chosen in `vars.nix` |
 | `hosts/_template/` | template for a new machine |
 | `hosts/<name>/` | one directory per machine (created by the installer): its hardware and `stateVersion` |
-| `flake.nix` | pins NixOS 26.05 and turns every directory in `hosts/` into a machine automatically |
+| `flake.nix` | sets the NixOS release and turns every directory in `hosts/` into a machine automatically |
 | `flake.lock` | records the exact versions, so all machines get the same software |
 | `scripts/menu.sh` | the installation menu; runs the scripts below in the right order |
 | `scripts/prepare-disk.sh` | choose, partition, encrypt and mount the disk |
 | `scripts/fetch-config.sh` | put the config on the new disk: download from GitHub, or copy locally |
-| `scripts/setup-user.sh` | ask for your username and write it to `vars.nix` |
+| `scripts/setup-user.sh` | ask for your username, full name, desktop and NixOS release |
+| `scripts/release.sh` | show the available NixOS releases and choose one (later also as the command `nixos-release`) |
 | `scripts/install.sh` | ask for the machine name, run `nixos-install`, set your password, show the versions |
 | `scripts/new-host.sh` | create `hosts/<name>/` (used by `install.sh`) |
 | `scripts/versions.sh` | show the versions of the system and your programs (later also as the command `versions`) |
@@ -92,7 +94,7 @@ read-only), and one for the config. Any stick will do for the config; it only ne
 ## Part 2: Install a machine
 
 ### 2.1 Make the installer USB stick
-Download the **Graphical ISO** of NixOS 26.05 from <https://nixos.org/download> and write it to a USB stick
+Download the **Graphical ISO** of the newest NixOS release from <https://nixos.org/download> and write it to a USB stick
 (e.g. with balenaEtcher). Turn **Secure Boot off** in the BIOS: this config uses systemd-boot without Secure Boot.
 Start the computer from the stick (usually F12, F2 or Esc during startup) and choose the stick under UEFI.
 
@@ -137,7 +139,7 @@ The menu shows all steps. Steps that are done get a ✔, and ▶ points to the n
      ✔ 1  Internet connection    connected
   ▶  · 2  Prepare disk
      · 3  Fetch config
-     · 4  Set up user
+     · 4  Settings
      · 5  Install
      · 6  Show versions
      · 7  Reboot
@@ -161,7 +163,7 @@ What each step does:
 | 1. Internet connection | Checks internet and whether your repo can be downloaded (the **Repo** line). No internet? It offers to set up Wi-Fi with `nmtui`. |
 | 2. Prepare disk | Lists the disks (number, size, SSD/HDD, connection, model). The USB stick you booted from cannot be chosen. You type the disk's name to confirm, choose encryption (recommended, default yes) and type a passphrase twice. Creates an EFI partition of 1 GiB and a system partition with the rest, and mounts them on `/mnt`. **Everything on that disk is erased.** |
 | 3. Fetch config | Puts the config in `/mnt/etc/nixos`. **Download config** (git clone from GitHub) when the repo can be downloaded, otherwise **Local config** (a copy of the folder from 2.3). It always says which one and why, and you can override it (`1` or `2`). |
-| 4. Set up user | Asks for your username and full name and writes them to `vars.nix`. Enter keeps the current value. |
+| 4. Settings | Asks for your username, full name, **desktop** (1 = GNOME, 2 = KDE Plasma) and **NixOS release**. The releases are looked up online, so new releases appear by themselves; the newest stable one is marked as recommended, and `unstable` is offered for the newest software. Enter keeps the current value each time. |
 | 5. Install | Asks for the machine name (e.g. `laptop`), detects the hardware, runs `nixos-install` (10 to 30 minutes), asks for a root password and your user password, and shows the versions. |
 | 6. Show versions | Shows the versions again: NixOS, kernel, systemd, desktop, Firefox, Chrome, Brave, Bitwarden, VLC. |
 | 7. Reboot | Remove the USB sticks. With encryption you first type the passphrase, then the login screen appears. |
@@ -248,8 +250,31 @@ Something broken after an update? Choose an older version in the boot menu.
 `modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<name>/default.nix` (one machine).
 Then `rebuild`, `git commit` and `git push`.
 
-**Next NixOS release:** 26.11 comes out at the end of November. To upgrade, change `nixos-26.05` into
-`nixos-26.11` in `flake.nix`, run `nixup`, commit and push. Never change the `stateVersion` in `hosts/`.
+---
+
+## New NixOS releases
+
+NixOS releases a new version twice a year (at the end of May and of November). Nothing changes by itself:
+your machines stay on the release in `flake.nix`, and `nixup` only installs updates within that release.
+An older release keeps getting security updates for about a month after the next one comes out, so upgrade
+within that month:
+
+1. Show and choose the release (the newest stable one is marked as recommended):
+   ```bash
+   nixos-release
+   ```
+2. Apply it and reboot:
+   ```bash
+   rebuild-boot
+   reboot
+   ```
+3. Save it, so your other machines follow (they run `git pull && rebuild-boot`):
+   ```bash
+   cd /etc/nixos && git commit -am "Upgrade NixOS" && git push
+   ```
+
+Never change `system.stateVersion` in `hosts/<name>/`: it stays the release the machine was first installed
+with. If something does not work after an upgrade, choose the previous version in the boot menu.
 
 ---
 

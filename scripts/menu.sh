@@ -4,7 +4,7 @@
 #   1. Internet connection   (set up Wi-Fi if needed; also checks whether the repo can be downloaded)
 #   2. Prepare disk          prepare-disk.sh
 #   3. Fetch config          fetch-config.sh
-#   4. Set up user           setup-user.sh
+#   4. Settings              setup-user.sh (username, desktop, NixOS release)
 #   5. Install               install.sh (machine name, nixos-install, password, versions)
 #   6. Show versions         versions.sh
 #   7. Reboot
@@ -142,6 +142,13 @@ var_of() {
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$CFG/vars.nix" | head -n 1
 }
 
+# NixOS release in the config's flake.nix ("YY.MM" or "unstable")
+release_of() {
+  [[ -f "$CFG/flake.nix" ]] || return 0
+  sed -n 's/.*inputs\.nixpkgs\.url.*"github:NixOS\/nixpkgs\/nixos-\([^"]*\)".*/\1/p' "$CFG/flake.nix" | head -n 1
+}
+desk_name() { case "$1" in gnome) echo "GNOME" ;; plasma) echo "KDE Plasma" ;; *) echo "$1" ;; esac; }
+
 st_disk()      { mountpoint -q "$MNT" 2>/dev/null && mountpoint -q "$MNT/boot" 2>/dev/null; }
 st_config()    { [[ -f "$CFG/flake.nix" && -f "$CFG/vars.nix" ]]; }
 st_user()      { local u; u="$(var_of username)"; [[ -n "$u" && "$u" != changeme ]]; }
@@ -214,7 +221,7 @@ detail() {  # short note next to a step
          echo "mounted on $MNT${src:+ ($src)}"
        fi ;;
     3) st_config && echo "in $CFG" ;;
-    4) st_config && st_user && echo "$(var_of username) ($(var_of fullName))" ;;
+    4) st_config && st_user && echo "$(var_of username) · $(desk_name "$(var_of desktop)") · NixOS $(release_of)" ;;
     5) if st_installed; then
          for d in "$CFG"/hosts/*/; do
            [[ -d "$d" ]] && [[ "$(basename "$d")" != _* ]] && hosts+=("$(basename "$d")")
@@ -225,7 +232,7 @@ detail() {  # short note next to a step
   return 0
 }
 
-TITLES=("" "Internet connection" "Prepare disk" "Fetch config" "Set up user"
+TITLES=("" "Internet connection" "Prepare disk" "Fetch config" "Settings"
         "Install" "Show versions" "Reboot")
 
 next_step() {
@@ -253,7 +260,8 @@ draw() {
   if (( ${#MISSING_CMDS[@]} > 0 )); then
     printf '  %-11s %s\n' "Tools" "${Y}missing: ${MISSING_CMDS[*]}${N} ${D}(t = install)${N}"
   fi
-  printf '  %-11s %s\n' "Desktop" "${desk:-${D}(no config yet)${N}}"
+  printf '  %-11s %s\n' "Desktop" "${desk:+$(desk_name "$desk")}${desk:-${D}(no config yet)${N}}"
+  [[ -n "$(release_of)" ]] && printf '  %-11s %s\n' "NixOS" "$(release_of)"
   if (( DRY_RUN )); then
     printf '  %-11s %s\n' "Mode" "${Y}DRY RUN${N} – nothing will be changed"
   fi
@@ -344,7 +352,7 @@ step_4() {
 
 step_5() {
   require 1 "there is no internet; nixos-install has to download packages (step 1)." || return 2
-  require 4 "the user has not been set up yet (step 4)." || return 2
+  require 4 "the settings have not been made yet (step 4)." || return 2
   dry_without_config install.sh && return 0
   MNT="$MNT" bash "$(script_in_cfg install.sh)" --no-reboot "${DRY[@]}"
 }

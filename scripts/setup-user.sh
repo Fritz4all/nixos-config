@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Asks for the username (and your full name) and writes them to vars.nix of the config in
-# <MNT>/etc/nixos (default /mnt/etc/nixos). Then it continues with the installation (install.sh).
+# Asks for the settings of the installation and writes them to the config in <MNT>/etc/nixos
+# (default /mnt/etc/nixos): username, full name and desktop (vars.nix), and the NixOS release
+# (flake.nix, via release.sh). Then it continues with the installation (install.sh).
 #
-# The value currently in vars.nix is the default answer: press Enter to keep it.
+# The current value is the default answer: press Enter to keep it.
 # Run this after fetch-config.sh (otherwise "Download config" overwrites your change again).
 #
 # Usage: bash scripts/setup-user.sh [options]
 #   --user NAME        username without asking
 #   --fullname NAME    full name without asking
+#   --desktop NAME     gnome or plasma, without asking
+#   --release RELEASE  NixOS release without asking (format YY.MM, or unstable)
 #   --no-continue      only change vars.nix, do not continue to install.sh
 #   --dry-run          only show what would happen
 # If the system is not mounted on /mnt: MNT=/path bash scripts/setup-user.sh
@@ -16,6 +19,8 @@ set -euo pipefail
 MNT="${MNT:-/mnt}"
 USER_ARG=""
 FULL_ARG=""
+DESK_ARG=""
+REL_ARG=""
 CONTINUE=1
 DRY_RUN=0
 
@@ -28,6 +33,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --user)        USER_ARG="${2:?--user needs a value}"; shift 2 ;;
     --fullname)    FULL_ARG="${2:?--fullname needs a value}"; shift 2 ;;
+    --desktop)     DESK_ARG="${2:?--desktop needs gnome or plasma}"; shift 2 ;;
+    --release)     REL_ARG="${2:?--release needs a release}"; shift 2 ;;
     --no-continue) CONTINUE=0; shift ;;
     --dry-run)     DRY_RUN=1; shift ;;
     -h|--help)     usage; exit 0 ;;
@@ -47,12 +54,13 @@ current() {
 
 CUR_USER="$(current username)"
 CUR_FULL="$(current fullName)"
+CUR_DESK="$(current desktop)"
 
 valid_user() { [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,30}$ && "$1" != root ]]; }
 valid_full() { [[ -n "$1" && "$1" != *\"* && "$1" != *\\* && "$1" != *\$* ]]; }
 
 echo
-echo "Set up the user for this and all other machines (stored in vars.nix)."
+echo "Settings for this and all other machines (stored in vars.nix and flake.nix)."
 echo
 
 ##### Username #####
@@ -89,6 +97,30 @@ else
   done
 fi
 
+##### Desktop #####
+
+desk_name() { case "$1" in gnome) echo "GNOME" ;; plasma) echo "KDE Plasma" ;; *) echo "$1" ;; esac; }
+
+DESKTOP="$DESK_ARG"
+if [[ -n "$DESKTOP" ]]; then
+  [[ "$DESKTOP" == gnome || "$DESKTOP" == plasma ]] || die "--desktop must be gnome or plasma."
+else
+  [[ "$CUR_DESK" == gnome || "$CUR_DESK" == plasma ]] || CUR_DESK=gnome
+  echo
+  echo "Desktop:"
+  echo "  1) GNOME"
+  echo "  2) KDE Plasma"
+  while true; do
+    prompt "Choose 1 or 2 [$(desk_name "$CUR_DESK")]: "
+    case "$REPLY" in
+      "") DESKTOP="$CUR_DESK"; break ;;
+      1|gnome|GNOME) DESKTOP=gnome; break ;;
+      2|plasma|kde|KDE) DESKTOP=plasma; break ;;
+      *) echo "Invalid choice." ;;
+    esac
+  done
+fi
+
 ##### Save #####
 
 # Make values safe for the replacement text of sed
@@ -104,9 +136,10 @@ set_var() {  # $1 = name, $2 = value
 
 set_var username "$USERNAME"
 set_var fullName "$FULLNAME"
+set_var desktop "$DESKTOP"
 
 if (( ! DRY_RUN )); then
-  [[ "$(current username)" == "$USERNAME" && "$(current fullName)" == "$FULLNAME" ]] \
+  [[ "$(current username)" == "$USERNAME" && "$(current fullName)" == "$FULLNAME" && "$(current desktop)" == "$DESKTOP" ]] \
     || die "Saving to $VARS failed. Edit it by hand."
   if command -v nix-instantiate >/dev/null 2>&1; then
     nix-instantiate --parse "$VARS" >/dev/null 2>&1 || die "$VARS is no longer valid Nix after the change. Check the file."
@@ -120,7 +153,15 @@ echo
 if (( DRY_RUN )); then echo "Dry run: this would be written to $VARS:"; else echo "Saved in $VARS:"; fi
 echo "  Username:   $USERNAME"
 echo "  Full name:  $FULLNAME"
-echo "Language, time zone, keyboard and desktop can be changed in the same file, if you like."
+echo "  Desktop:    $(desk_name "$DESKTOP")"
+echo "Language, time zone and keyboard can be changed in the same file, if you like."
+
+##### NixOS release #####
+
+REL_OPTS=(--dir "$CFG")
+(( DRY_RUN )) && REL_OPTS+=(--dry-run)
+[[ -n "$REL_ARG" ]] && REL_OPTS+=(--set "$REL_ARG")
+bash "$CFG/scripts/release.sh" "${REL_OPTS[@]}" || die "Choosing the NixOS release failed."
 
 ##### Continue #####
 

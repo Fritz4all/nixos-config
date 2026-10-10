@@ -22,3 +22,6 @@ id_ed25519*
 
 # Local development and test tools; not needed for installing, so not on GitHub.
 dev/
+
+# Notes for the AI assistant (Claude Code); kept locally only.
+CLAUDE.md

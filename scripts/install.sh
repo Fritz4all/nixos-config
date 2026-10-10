@@ -133,6 +133,7 @@ echo "Overview"
 echo "  Machine:        $NAME"
 echo "  User:           $USERNAME"
 echo "  Desktop:        ${DESKTOP:-unknown}"
+echo "  NixOS release:  $(sed -n 's/.*inputs\.nixpkgs\.url.*nixos-\([^"]*\)".*/\1/p' "$CFG/flake.nix" | head -n 1)"
 echo "  Config:         $CFG"
 echo "  Target system:  $MNT"
 echo

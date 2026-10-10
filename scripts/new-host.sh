@@ -46,10 +46,15 @@ if [[ -e "$DEST" ]]; then
   exit 1
 fi
 
-# stateVersion = version of the system you are running now (the installer), e.g. "26.05"
-STATE_VERSION="$(nixos-version 2>/dev/null | cut -d. -f1,2 || true)"
+# stateVersion = the NixOS release this machine is first installed with (format YY.MM).
+# Taken from flake.nix; for nixos-unstable from the installer that is running now.
+STATE_VERSION="$(sed -n 's/.*inputs\.nixpkgs\.url.*nixos-\([0-9][0-9]\.[0-9][0-9]\)".*/\1/p' "$REPO/flake.nix" | head -n 1)"
 if [[ ! "$STATE_VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]]; then
-  STATE_VERSION="26.05"
+  STATE_VERSION="$(nixos-version 2>/dev/null | cut -d. -f1,2 || true)"
+fi
+if [[ ! "$STATE_VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]]; then
+  echo "Cannot determine the NixOS release for system.stateVersion (no release in flake.nix, no nixos-version)." >&2
+  exit 1
 fi
 
 mkdir -p "$DEST"
