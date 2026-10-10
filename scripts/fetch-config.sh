@@ -347,9 +347,9 @@ else
   echo "Done: the config is in $DEST"
   echo "Source: $RESULT_LABEL ($RESULT_FROM)"
 fi
-[[ -n "${INSTALL_MENU:-}" ]] && exit 0  # menu.sh shows the next step itself
+[[ -n "${INSTALL_MENU:-}" ]] && exit 0  # the installation menu shows the next step itself
 cat <<EOF
 
 Next step, set up the username (after that it continues with the installation):
-  ${ROOTPREFIX}bash $DEST/scripts/setup-user.sh
+  ${ROOTPREFIX}bash $DEST/scripts/settings.sh
 EOF

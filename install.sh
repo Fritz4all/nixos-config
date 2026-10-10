@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# Installation menu: every step of the installation in one overview.
+# The NixOS installer: an installation menu with every step in one overview.
 #
 #   1. Internet connection   (set up Wi-Fi if needed; also checks whether the repo can be downloaded)
-#   2. Prepare disk          prepare-disk.sh
-#   3. Fetch config          fetch-config.sh
-#   4. Settings              setup-user.sh (username, desktop, Full or Minimal apps, NixOS release)
-#   5. Install               install.sh (machine name, nixos-install, password, versions)
+#   2. Prepare disk          scripts/prepare-disk.sh
+#   3. Fetch config          scripts/fetch-config.sh
+#   4. Settings              scripts/settings.sh (username, desktop, Full or Minimal apps, NixOS release)
+#   5. Install               scripts/install-system.sh (machine name, nixos-install, passwords, versions)
 #   6. Reboot
 #
 # The menu shows which steps are already done. Enter runs the next step,
-# 'a' runs all remaining steps one after another.
+# 'a' runs all remaining steps one after another, 'i' shows info (the versions of the installed system).
 #
 # At the start it checks that all tools it needs are present (git, curl, disk tools, nixos-install).
 # Missing tools are installed only when you agree, and only for this session (via nix-shell).
 #
 # Usage (in the NixOS installer, from a directory outside /mnt, e.g. /root/nixos-config):
-#   bash scripts/menu.sh [--dry-run]
+#   bash install.sh [--dry-run]
 #   --dry-run     only show what would happen (can also be toggled in the menu)
 #   --root DIR    where the new system gets mounted (default /mnt; meant for testing only)
 set -euo pipefail
 
-SELF_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SELF_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MNT="/mnt"
 DRY_RUN=0
 ORIG_ARGS=("$@")
@@ -135,7 +135,7 @@ declare -A DONE=()   # steps that succeeded in this session (needed for dry runs
 
 has_internet() { curl -fsS --max-time 4 -o /dev/null https://cache.nixos.org/nix-cache-info >/dev/null 2>&1; }
 
-# Current value from vars.nix (simple "string" values only), same approach as setup-user.sh
+# Current value from vars.nix (simple "string" values only), same approach as scripts/settings.sh
 var_of() {
   [[ -f "$CFG/vars.nix" ]] || return 0
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$CFG/vars.nix" | head -n 1
@@ -272,7 +272,7 @@ draw() {
   done
   echo
   echo "  ${B}Enter${N} = run step $next   ${B}1-6${N} = choose a step   ${B}a${N} = run everything"
-  echo "  ${B}d${N} = dry run $( (( DRY_RUN )) && echo off || echo on)   ${B}r${N} = refresh   ${B}q${N} = quit"
+  echo "  ${B}d${N} = dry run $( (( DRY_RUN )) && echo off || echo on)   ${B}i${N} = info (versions)   ${B}r${N} = refresh   ${B}q${N} = quit"
   (( ${#MISSING_CMDS[@]} > 0 )) && echo "  ${B}t${N} = install missing tools"
   return 0
   echo
@@ -345,15 +345,15 @@ step_3() {
 
 step_4() {
   require 3 "the config has not been fetched yet (step 3)." || return 2
-  dry_without_config setup-user.sh && return 0
-  MNT="$MNT" bash "$(script_in_cfg setup-user.sh)" --no-continue "${DRY[@]}"
+  dry_without_config settings.sh && return 0
+  MNT="$MNT" bash "$(script_in_cfg settings.sh)" --no-continue "${DRY[@]}"
 }
 
 step_5() {
   require 1 "there is no internet; nixos-install has to download packages (step 1)." || return 2
   require 4 "the settings have not been made yet (step 4)." || return 2
-  dry_without_config install.sh && return 0
-  MNT="$MNT" bash "$(script_in_cfg install.sh)" --no-reboot "${DRY[@]}"
+  dry_without_config install-system.sh && return 0
+  MNT="$MNT" bash "$(script_in_cfg install-system.sh)" --no-reboot "${DRY[@]}"
 }
 
 step_6() {
@@ -368,6 +368,27 @@ step_6() {
     ask_yes "Reboot now?" y || { echo "Not rebooted. You can do that later with step 6 or the reboot command."; return 2; }
   fi
   if (( DRY_RUN )); then echo "+ reboot"; else reboot; fi
+}
+
+# Info (key i): the versions of the installed system, or what is going to be installed.
+show_info() {
+  clear_screen
+  echo "${C}${B}── Info ──${N}"
+  echo
+  if st_installed; then
+    bash "$(script_in_cfg versions.sh)" --root "$MNT" || echo "${R}The versions could not be read.${N}"
+  else
+    echo "Nothing has been installed yet; after step 5 this shows the versions of the installed system."
+    if st_config; then
+      echo
+      echo "What is going to be installed (from $CFG):"
+      echo "  User:           $(var_of username)"
+      echo "  Desktop:        $(desk_name "$(var_of desktop)") ($(var_of desktopApps))"
+      echo "  NixOS release:  $(release_of)"
+      echo "  Always:         Firefox, Google Chrome, Brave, Bitwarden, VLC"
+    fi
+  fi
+  return 0
 }
 
 # Runs a step. Ctrl+C stops only the step, not the menu.
@@ -431,9 +452,10 @@ while true; do
       else
         DRY_RUN=$(( ! DRY_RUN )); DONE=()
       fi ;;
+    i|I) show_info; pause ;;
     r|R) refresh ;;
     t|T) offer_tools; refresh ;;
-    q|Q)  echo "Stopped. Continue later? Run again: bash $SELF_REPO/scripts/menu.sh"; exit 0 ;;
+    q|Q)  echo "Stopped. Continue later? Run again: bash $SELF_REPO/install.sh"; exit 0 ;;
     *)    ;;
   esac
 done

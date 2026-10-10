@@ -5,9 +5,9 @@
 #   3. lets you set the password of your user
 #   4. shows an overview of all versions
 #
-# Usage: bash scripts/install.sh [hostname] [--dry-run] [--no-reboot]
+# Usage: bash scripts/install-system.sh [hostname] [--dry-run] [--no-reboot]
 #   --dry-run    only show what would happen, nothing is installed
-#   --no-reboot  do not ask to reboot at the end (used by menu.sh)
+#   --no-reboot  do not ask to reboot at the end (used by install.sh, the installation menu)
 set -euo pipefail
 
 MNT="${MNT:-/mnt}"

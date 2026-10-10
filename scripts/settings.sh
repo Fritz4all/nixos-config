@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Asks for the settings of the installation and writes them to the config in <MNT>/etc/nixos
 # (default /mnt/etc/nixos): username, full name, desktop and its apps (vars.nix), and the NixOS release
-# (flake.nix, via release.sh). Then it continues with the installation (install.sh).
+# (flake.nix, via release.sh). Then it continues with the installation (install-system.sh).
 #
 # The current value is the default answer: press Enter to keep it.
 # Run this after fetch-config.sh (otherwise "Download config" overwrites your change again).
 #
-# Usage: bash scripts/setup-user.sh [options]
+# Usage: bash scripts/settings.sh [options]
 #   --user NAME        username without asking
 #   --fullname NAME    full name without asking
 #   --desktop NAME     gnome or plasma, without asking
 #   --apps SET         full or minimal (apps that come with the desktop), without asking
 #   --release RELEASE  NixOS release without asking (format YY.MM, or unstable)
-#   --no-continue      only change vars.nix, do not continue to install.sh
+#   --no-continue      only change vars.nix, do not continue to install-system.sh
 #   --dry-run          only show what would happen
-# If the system is not mounted on /mnt: MNT=/path bash scripts/setup-user.sh
+# If the system is not mounted on /mnt: MNT=/path bash scripts/settings.sh
 set -euo pipefail
 
 MNT="${MNT:-/mnt}"
@@ -213,7 +213,7 @@ case "$REPLY" in
   [nN]*)
     echo
     echo "OK. You can install later with:"
-    if [[ "$MNT" == /mnt ]]; then echo "  bash $CFG/scripts/install.sh"; else echo "  MNT=$MNT bash $CFG/scripts/install.sh"; fi
+    if [[ "$MNT" == /mnt ]]; then echo "  bash $CFG/scripts/install-system.sh"; else echo "  MNT=$MNT bash $CFG/scripts/install-system.sh"; fi
     exit 0
     ;;
 esac
@@ -221,4 +221,4 @@ esac
 ARGS=()
 (( DRY_RUN )) && ARGS+=(--dry-run)
 export MNT
-exec bash "$CFG/scripts/install.sh" "${ARGS[@]}"
+exec bash "$CFG/scripts/install-system.sh" "${ARGS[@]}"

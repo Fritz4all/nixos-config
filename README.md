@@ -5,7 +5,7 @@ during installation, switching later is one line), with Firefox, Google Chrome, 
 from the releases that are available at that moment, and can be changed later with one command (`nixos-release`).
 
 Installing a machine comes down to: boot the NixOS installer, get this folder, run
-`bash scripts/menu.sh` and follow the menu.
+`bash install.sh` and follow the menu.
 
 ---
 
@@ -14,6 +14,7 @@ Installing a machine comes down to: boot the NixOS installer, get this folder, r
 ```
 nixos-config/
 ├── README.md        this guide
+├── install.sh       THE INSTALLER: start this in the NixOS live system
 ├── flake.nix        ┐
 ├── flake.lock       │  THE CONFIGURATION AND THE INSTALLER
 ├── vars.nix         │  Needed on GitHub and on the USB stick.
@@ -38,13 +39,13 @@ Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 | `hosts/<name>/` | one directory per machine (created by the installer): its hardware and `stateVersion` |
 | `flake.nix` | sets the NixOS release and turns every directory in `hosts/` into a machine automatically |
 | `flake.lock` | records the exact versions, so all machines get the same software |
-| `scripts/menu.sh` | the installation menu; runs the scripts below in the right order |
+| `install.sh` | **the installer**: a menu that runs the steps below in the right order |
 | `scripts/prepare-disk.sh` | choose, partition, encrypt and mount the disk |
 | `scripts/fetch-config.sh` | put the config on the new disk: download from GitHub, or copy locally |
-| `scripts/setup-user.sh` | ask for your username, full name, desktop, Full/Minimal apps and NixOS release |
+| `scripts/settings.sh` | step 4: ask for your username, full name, desktop, Full/Minimal apps and NixOS release |
 | `scripts/release.sh` | show the available NixOS releases and choose one (later also as the command `nixos-release`) |
-| `scripts/install.sh` | ask for the machine name, run `nixos-install`, set your password, show the versions |
-| `scripts/new-host.sh` | create `hosts/<name>/` (used by `install.sh`) |
+| `scripts/install-system.sh` | step 5: ask for the machine name, run `nixos-install`, set the passwords, show the versions |
+| `scripts/new-host.sh` | create `hosts/<name>/` (used by `install-system.sh`) |
 | `scripts/versions.sh` | show the versions of the system and your programs (later also as the command `versions`) |
 
 Shared = everything in `vars.nix` and `modules/`. Different per machine = only its directory in `hosts/`.
@@ -128,7 +129,7 @@ Choose **one** of the two ways. The menu asks for administrator rights by itself
 **A. Straight from the config USB stick** (Part 1). Plug in the stick and click it once in the file manager
 (Files), so it is mounted. Then, in the terminal:
 ```bash
-bash /run/media/nixos/*/nixos-config*/scripts/menu.sh
+bash /run/media/nixos/*/nixos-config*/install.sh
 ```
 Leave the stick in until step 3 of the menu is done (the config is then copied to the new disk). The stick
 cannot be chosen as the installation disk by accident: the menu shows it as "in use".
@@ -136,7 +137,7 @@ cannot be chosen as the installation disk by accident: the menu shows it as "in 
 **B. From GitHub** (needs internet, no Git needed):
 ```bash
 curl -L https://github.com/Fritz4all/nixos-config/archive/refs/heads/main.tar.gz | tar xz -C /tmp
-bash /tmp/nixos-config-main/scripts/menu.sh
+bash /tmp/nixos-config-main/install.sh
 ```
 
 ### 2.4 The installation menu
@@ -160,11 +161,13 @@ The menu shows all steps. Steps that are done get a ✔, and ▶ points to the n
      · 6  Reboot
 
   Enter = run step 2   1-6 = choose a step   a = run everything
-  d = dry run on   r = refresh   q = quit
+  d = dry run on   i = info (versions)   r = refresh   q = quit
 ```
 
 - **Enter** runs the next step, **a** runs all remaining steps one after another, a **number** runs that step
   (for example to redo one).
+- **i** (info) shows the versions of the installed system (NixOS, kernel, desktop, Firefox, Chrome, Brave,
+  Bitwarden, VLC); before installing it shows what is going to be installed.
 - **d** (or `--dry-run`) is a dry run: everything is shown, nothing is changed. Handy to look around first.
 - You can quit (**q**) and start the menu again at any time; it sees by itself which steps are done.
 - At the start the menu checks that every tool it needs is there (git, curl, disk tools, `nixos-install`).
@@ -327,7 +330,7 @@ The menu only calls these scripts; you can also run them yourself, in this order
 ```bash
 bash scripts/prepare-disk.sh                     # --dry-run available
 bash scripts/fetch-config.sh                     # options below
-bash /mnt/etc/nixos/scripts/setup-user.sh        # continues with install.sh by itself
+bash /mnt/etc/nixos/scripts/settings.sh          # continues with install-system.sh by itself
 ```
 
 `fetch-config.sh` options:

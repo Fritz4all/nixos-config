@@ -3,7 +3,7 @@
 # The release is the branch in flake.nix: inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-<release>";
 # Available releases are looked up online (channels.nixos.org), so new releases appear automatically.
 #
-# Used during installation (by setup-user.sh) and later to upgrade (command: nixos-release).
+# Used during installation (by settings.sh, step 4 of the installer) and later to upgrade (command: nixos-release).
 # After changing the release on an installed machine: rebuild-boot, reboot, commit and push.
 #
 # Usage: bash scripts/release.sh [options]

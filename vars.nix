@@ -1,5 +1,5 @@
 # Central settings that apply to ALL machines.
-# The username and full name are set during installation with scripts/setup-user.sh.
+# The username and full name are set during installation with the installer (step 4, scripts/settings.sh).
 # Change the rest (language, time zone, keyboard, desktop) here.
 {
   # Your user account (the same on every machine)

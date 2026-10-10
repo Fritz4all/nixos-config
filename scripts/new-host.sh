@@ -76,9 +76,9 @@ fi
 
 echo
 echo "Done: hosts/$NAME has been created (stateVersion $STATE_VERSION)."
-# install.sh continues by itself; only point to the next step when used on its own.
+# install-system.sh continues by itself; only point to the next step when used on its own.
 if [[ -z "${NEW_HOST_QUIET:-}" ]]; then
   echo
   echo "Next step, install:"
-  echo "  bash $REPO/scripts/install.sh $NAME"
+  echo "  bash $REPO/scripts/install-system.sh $NAME"
 fi
