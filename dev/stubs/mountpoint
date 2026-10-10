@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fake mountpoint: a directory counts as mounted when it contains a file named .mounted
+p="${*: -1}"; [[ -e "$p/.mounted" ]]

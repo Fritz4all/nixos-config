@@ -1,0 +1,12 @@
+#!/bin/bash
+a="$*"
+case "$a" in
+  *"NAME,TYPE"*) printf '/dev/sda disk\n/dev/vda disk\n' ;;
+  *MOUNTPOINT*) [[ "$a" == *sda* ]] && echo /iso ;;
+  *SIZE*/dev/sda*) echo 16G ;; *SIZE*) echo 500G ;;
+  *MODEL*/dev/sda*) echo "USB Stick" ;; *MODEL*) echo "Samsung SSD" ;;
+  *TRAN*/dev/sda*) echo usb ;; *TRAN*) echo nvme ;;
+  *ROTA*) echo 0 ;;
+  *"-nlpo NAME"*) echo /dev/vda; echo /dev/vda1 ;;
+  *) echo "NAME SIZE (stub lsblk $a)" ;;
+esac

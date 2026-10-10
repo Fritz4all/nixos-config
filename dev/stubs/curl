@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Fake curl: STUB_OFFLINE=1 means no internet, STUB_REPO=0 means the repo can be downloaded.
+for a in "$@"; do
+  case "$a" in *info/refs*) exit "${STUB_REPO:-1}" ;; esac
+done
+exit "${STUB_OFFLINE:-0}"

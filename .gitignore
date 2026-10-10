@@ -1,0 +1,5 @@
+# Files that are created while building or testing. They never belong on Git or the USB stick.
+result
+result-*
+*.qcow2
+.nix-portable/

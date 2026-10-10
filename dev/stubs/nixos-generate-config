@@ -1,0 +1,2 @@
+#!/bin/bash
+echo '{ ... }: { fileSystems."/".device = "/dev/disk/by-uuid/aaaa-1111"; }'
