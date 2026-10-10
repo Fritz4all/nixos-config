@@ -13,7 +13,8 @@ Flake configuration for NixOS 26.05 ("Yarara"), meant to be installed on several
 - Software: Firefox, Google Chrome, Brave, Bitwarden, VLC (plus `gh` for pushing to GitHub).
 - Desktop: GNOME, easy to switch to KDE Plasma (`desktop` in `vars.nix`, or `my.desktop` per machine).
 - Installation fully via scripts in the NixOS installer, driven by `scripts/menu.sh`; README describes the steps.
-- The repo is not on GitHub yet (2026-10-10). `repoUrl` in `vars.nix` stays empty until the user uploads it.
+- Public repo: https://github.com/Fritz4all/nixos-config (since 2026-10-10; `repoUrl` in `vars.nix` points to it).
+  Commits use the GitHub noreply address (set in the repo's local git config), not a personal e-mail.
 
 ## Layout
 - Needed for installing (on GitHub and the USB stick): `flake.nix`, `flake.lock` (after first install),
@@ -60,8 +61,8 @@ Flake configuration for NixOS 26.05 ("Yarara"), meant to be installed on several
   against real GitHub URLs (existing repo → 0, missing repo → curl exit 22).
 - The "attach a local copy to GitHub" flow in README 3.5 (`git fetch` + `git reset --soft origin/main` on an
   unborn branch) was tested with real git.
-- **Not tested:** real partitioning and installation on hardware (prepare-disk.sh, nixos-install), and the
-  upload to GitHub itself.
+- The menu sees the real repo as "can be downloaded", and the tarball download from README 3.3 B works.
+- **Not tested:** real partitioning and installation on hardware (prepare-disk.sh, nixos-install).
 
 ## Possible next steps
 - Home Manager for user settings (GNOME settings, dotfiles).
