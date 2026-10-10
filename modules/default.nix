@@ -3,6 +3,7 @@
   imports = [
     ./common.nix
     ./apps.nix
+    ./commands.nix
     ./desktop
   ];
 }

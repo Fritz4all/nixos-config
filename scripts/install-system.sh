@@ -204,6 +204,10 @@ if git -C "$CFG" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   run git -C "$CFG" add -A
 fi
 
+# Give /etc/nixos to the user, so editing the config, git and the daily commands work without sudo
+run nixos-enter --root "$MNT" -c "chown -R $USERNAME:users /etc/nixos" \
+  || warn "Could not give /etc/nixos to $USERNAME. After the first start run: sudo chown -R \$USER:users /etc/nixos"
+
 ##### Versions #####
 
 run bash "$CFG/scripts/versions.sh" --root "$MNT"
@@ -213,7 +217,7 @@ echo "Installation of '$NAME' is finished."
 echo
 echo "Next steps:"
 echo "  1. Remove the USB stick and reboot."
-echo "  2. After the first boot: sudo chown -R \$USER:users /etc/nixos, then commit and push (see README)."
+echo "  2. After the first boot: commit and push the new machine (see README, 2.5)."
 echo "  3. You can view the versions again later with: versions"
 echo
 read -rp "Reboot now? [y/N]: " rb

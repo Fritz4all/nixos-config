@@ -193,10 +193,10 @@ configuration does not match the mounted disk.
 
 ### 2.5 After the first start: save the new machine to GitHub
 The installation created `hosts/<name>/` and `flake.lock`. Save them, so other machines get the same versions.
+The installer has made you the owner of `/etc/nixos`, so you can edit it without `sudo`.
 In a terminal, logged in as yourself:
 
 ```bash
-sudo chown -R $USER:users /etc/nixos
 cd /etc/nixos
 git config --global user.name "Your Name"
 git config --global user.email "you@example.com"
@@ -268,7 +268,11 @@ Your own apps (Firefox, Chrome, …) stay the same. The settings of each desktop
 | `rebuild-boot` | apply at the next reboot (safe for big changes) |
 | `nixup` | update all packages (`nix flake update`) and apply |
 | `versions` | show the versions of NixOS, kernel, desktop and your programs |
+| `nixos-release` | show or change the NixOS release (see "New NixOS releases") |
 | `sudo nixos-rebuild switch --rollback` | go back to the previous version |
+
+These are real commands (in `modules/commands/`): they work with and without `sudo` and ask for your password
+when needed. They build as the owner of `/etc/nixos` and only use administrator rights to activate.
 
 Something broken after an update? Choose an older version in the boot menu.
 

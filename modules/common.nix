@@ -103,12 +103,5 @@
   # Chrome, Brave and other Electron apps then run natively on Wayland (sharper rendering)
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
-  # Handy shortcuts. On every machine the config lives in /etc/nixos.
-  environment.shellAliases = {
-    rebuild = "sudo nixos-rebuild switch --flake /etc/nixos";
-    rebuild-boot = "sudo nixos-rebuild boot --flake /etc/nixos";
-    nixup = "nix flake update --flake /etc/nixos && sudo nixos-rebuild switch --flake /etc/nixos";
-    versions = "bash /etc/nixos/scripts/versions.sh";
-    nixos-release = "bash /etc/nixos/scripts/release.sh";  # show or change the NixOS release
-  };
+  # The commands rebuild, rebuild-boot, nixup, versions and nixos-release are in commands.nix.
 }
