@@ -6,8 +6,7 @@
 #   3. Fetch config          fetch-config.sh
 #   4. Settings              setup-user.sh (username, desktop, Full or Minimal apps, NixOS release)
 #   5. Install               install.sh (machine name, nixos-install, password, versions)
-#   6. Show versions         versions.sh
-#   7. Reboot
+#   6. Reboot
 #
 # The menu shows which steps are already done. Enter runs the next step,
 # 'a' runs all remaining steps one after another.
@@ -233,12 +232,12 @@ detail() {  # short note next to a step
 }
 
 TITLES=("" "Internet connection" "Prepare disk" "Fetch config" "Settings"
-        "Install" "Show versions" "Reboot")
+        "Install" "Reboot")
 
 next_step() {
   local i
   for i in 1 2 3 4 5; do is_done "$i" || { echo "$i"; return 0; }; done
-  echo 7
+  echo 6
 }
 
 ##### Drawing the menu #####
@@ -266,13 +265,13 @@ draw() {
     printf '  %-11s %s\n' "Mode" "${Y}DRY RUN${N} – nothing will be changed"
   fi
   echo
-  for i in 1 2 3 4 5 6 7; do
+  for i in 1 2 3 4 5 6; do
     if (( i <= 5 )) && is_done "$i"; then mark="${G}✔${N}"; else mark="${D}·${N}"; fi
     nr="   "; [[ "$i" == "$next" ]] && nr="${Y}${B}▶${N}  "
     printf '  %s%s %s%d%s  %-22s %s%s%s\n' "$nr" "$mark" "$B" "$i" "$N" "${TITLES[$i]}" "$D" "$(detail "$i")" "$N"
   done
   echo
-  echo "  ${B}Enter${N} = run step $next   ${B}1-7${N} = choose a step   ${B}a${N} = run everything"
+  echo "  ${B}Enter${N} = run step $next   ${B}1-6${N} = choose a step   ${B}a${N} = run everything"
   echo "  ${B}d${N} = dry run $( (( DRY_RUN )) && echo off || echo on)   ${B}r${N} = refresh   ${B}q${N} = quit"
   (( ${#MISSING_CMDS[@]} > 0 )) && echo "  ${B}t${N} = install missing tools"
   return 0
@@ -358,14 +357,6 @@ step_5() {
 }
 
 step_6() {
-  if ! st_installed; then
-    echo "There is no installed system on $MNT yet (step 5)."
-    return 2
-  fi
-  bash "$(script_in_cfg versions.sh)" --root "$MNT"
-}
-
-step_7() {
   if ! st_installed && (( ! DRY_RUN )); then
     echo "${Y}Note:${N} nothing has been installed yet. After a reboot you start over."
     ask_yes "Reboot anyway?" n || return 2
@@ -374,7 +365,7 @@ step_7() {
     if [[ -e /dev/mapper/cryptroot ]]; then
       echo "During boot the computer will first ask for the disk passphrase."
     fi
-    ask_yes "Reboot now?" y || { echo "Not rebooted. You can do that later with step 7 or the reboot command."; return 2; }
+    ask_yes "Reboot now?" y || { echo "Not rebooted. You can do that later with step 6 or the reboot command."; return 2; }
   fi
   if (( DRY_RUN )); then echo "+ reboot"; else reboot; fi
 }
@@ -406,8 +397,8 @@ run_all() {
   while true; do
     refresh
     n="$(next_step)"
-    if [[ "$n" == 7 ]]; then
-      run_step 7 || true
+    if [[ "$n" == 6 ]]; then
+      run_step 6 || true
       return 0
     fi
     run_step "$n" || return 0
@@ -427,7 +418,7 @@ while true; do
   prompt "Choice: "
   case "$REPLY" in
     "")   run_step "$(next_step)" || true; pause; refresh ;;
-    [1-7]) run_step "$REPLY" || true; pause; refresh ;;
+    [1-6]) run_step "$REPLY" || true; pause; refresh ;;
     a|A)
       echo "All remaining steps will run one after another; it stops at the first error."
       if ask_yes "Start?" y; then run_all; pause; fi

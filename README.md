@@ -157,10 +157,9 @@ The menu shows all steps. Steps that are done get a ✔, and ▶ points to the n
      · 3  Fetch config
      · 4  Settings
      · 5  Install
-     · 6  Show versions
-     · 7  Reboot
+     · 6  Reboot
 
-  Enter = run step 2   1-7 = choose a step   a = run everything
+  Enter = run step 2   1-6 = choose a step   a = run everything
   d = dry run on   r = refresh   q = quit
 ```
 
@@ -181,8 +180,7 @@ What each step does:
 | 3. Fetch config | Puts the config in `/mnt/etc/nixos`. **Download config** (git clone from GitHub) when the repo can be downloaded, otherwise **Local config** (a copy of the folder from 2.3). It always says which one and why, and you can override it (`1` or `2`). |
 | 4. Settings | Asks for your username, full name, **desktop** (1 = GNOME, 2 = KDE Plasma), the **apps** that come with it (1 = Full, 2 = Minimal; see below) and the **NixOS release**. The releases are looked up online, so new releases appear by themselves; the newest stable one is marked as recommended, and `unstable` is offered for the newest software. Enter keeps the current value each time. |
 | 5. Install | Asks for the machine name (e.g. `laptop`), detects the hardware, runs `nixos-install` (10 to 30 minutes), asks for a root password and your user password, and shows the versions. |
-| 6. Show versions | Shows the versions again: NixOS, kernel, systemd, desktop, Firefox, Chrome, Brave, Bitwarden, VLC. |
-| 7. Reboot | Remove the USB sticks. With encryption you first type the passphrase, then the login screen appears. |
+| 6. Reboot | Remove the USB sticks. With encryption you first type the passphrase, then the login screen appears. |
 
 Your Wi-Fi password is not copied from the live environment; enter it again after the first start.
 
