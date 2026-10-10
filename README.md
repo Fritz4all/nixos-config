@@ -280,6 +280,16 @@ Something broken after an update? Choose an older version in the boot menu.
 `modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<name>/default.nix` (one machine).
 Then `rebuild`, `git commit` and `git push`.
 
+**Unfree software** (e.g. Google Chrome, Spotify, Steam) is refused unless it is listed in `my.allowedUnfree`, so
+nothing unfree gets in unnoticed. To add one, put its name in that list in `modules/apps.nix` (all machines) or
+add `my.allowedUnfree = [ "spotify" ];` to `hosts/<name>/default.nix` (one machine). Firmware and CPU microcode
+are always allowed.
+
+**Trying software temporarily** (nothing is installed, no new generation): `nix run nixpkgs#gimp` starts it once,
+`nix shell nixpkgs#gimp` makes it available in that terminal until you close it. For unfree software:
+`NIXPKGS_ALLOW_UNFREE=1 nix shell --impure nixpkgs#spotify`. The downloads are removed by the weekly cleanup
+(or right away with `nix-collect-garbage`).
+
 ---
 
 ## New NixOS releases
