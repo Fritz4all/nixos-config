@@ -33,6 +33,13 @@ for arg in "$@"; do
   esac
 done
 
+# Asks "Try again?" after a failed attempt (e.g. a typo in a passphrase). Exit code 0 = try again.
+try_again() {
+  local again
+  read -rp "Try again? [Y/n]: " again || return 1
+  [[ ! "$again" =~ ^[nN] ]]
+}
+
 # Check that we run in the right environment (with --dry-run only warn).
 check() {
   local msg="$1"
@@ -178,9 +185,16 @@ if (( ENCRYPT )); then
   echo
   echo "Now choose a strong passphrase for the disk encryption."
   echo "You type it every time the laptop starts. If you lose it, your data is gone."
-  run cryptsetup luksFormat --batch-mode --verify-passphrase "$P2"
+  echo "You type it twice; a typo just means you can try again."
+  until run cryptsetup luksFormat --batch-mode --verify-passphrase "$P2"; do
+    echo "That did not work (the two passphrases probably did not match)."
+    try_again || die "Encryption was not set up. Run this step again to start over."
+  done
   echo "Type the passphrase once more to open the disk:"
-  run cryptsetup open "$P2" "$MAPPER"
+  until run cryptsetup open "$P2" "$MAPPER"; do
+    echo "The disk could not be opened (wrong passphrase?)."
+    try_again || die "The disk was not opened. Run this step again to start over."
+  done
   ROOT_DEV="/dev/mapper/$MAPPER"
 else
   ROOT_DEV="$P2"

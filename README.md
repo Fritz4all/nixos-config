@@ -176,10 +176,10 @@ What each step does:
 | Step | What happens |
 |---|---|
 | 1. Internet connection | Checks internet and whether your repo can be downloaded (the **Repo** line). No internet? It offers to set up Wi-Fi with `nmtui`. |
-| 2. Prepare disk | Lists the disks (number, size, SSD/HDD, connection, model). The USB stick you booted from cannot be chosen. You type the disk's name to confirm, choose encryption (recommended, default yes) and type a passphrase twice. Creates an EFI partition of 1 GiB and a system partition with the rest, and mounts them on `/mnt`. **Everything on that disk is erased.** |
+| 2. Prepare disk | Lists the disks (number, size, SSD/HDD, connection, model). The USB stick you booted from cannot be chosen. You type the disk's name to confirm, choose encryption (recommended, default yes) and type a passphrase twice (a typo? you simply get to try again). Creates an EFI partition of 1 GiB and a system partition with the rest, and mounts them on `/mnt`. **Everything on that disk is erased.** |
 | 3. Fetch config | Puts the config in `/mnt/etc/nixos`. **Download config** (git clone from GitHub) when the repo can be downloaded, otherwise **Local config** (a copy of the folder from 2.3). It always says which one and why, and you can override it (`1` or `2`). |
 | 4. Settings | Asks for your username, full name, **desktop** (1 = GNOME, 2 = KDE Plasma), the **apps** that come with it (1 = Full, 2 = Minimal; see below) and the **NixOS release**. The releases are looked up online, so new releases appear by themselves; the newest stable one is marked as recommended, and `unstable` is offered for the newest software. Enter keeps the current value each time. |
-| 5. Install | Asks for the machine name (e.g. `laptop`), detects the hardware, runs `nixos-install` (10 to 30 minutes), asks for a root password and your user password, and shows the versions. |
+| 5. Install | Asks for the machine name (e.g. `laptop`), detects the hardware, runs `nixos-install` (10 to 30 minutes), then asks for a root password and your user password (each typed twice; a typo means you simply try again), and shows the versions. |
 | 6. Reboot | Remove the USB sticks. With encryption you first type the passphrase, then the login screen appears. |
 
 Your Wi-Fi password is not copied from the live environment; enter it again after the first start.

@@ -171,23 +171,33 @@ trap 'echo; echo "The installation did not finish. Read the error message above;
 
 echo
 echo "nixos-install is starting (this takes 10 to 30 minutes) ..."
-echo "At the end it asks for a root password."
-run nixos-install --flake "$CFG#$NAME"
+echo "After that you set two passwords: one for root (the administrator account) and one for $USERNAME."
+# --no-root-passwd: the root password is set below, where a typo only means trying again
+# (when nixos-install asks for it itself, a typo makes the whole installation fail).
+run nixos-install --no-root-passwd --flake "$CFG#$NAME"
 
 trap - ERR
 
-##### Password of your user #####
+##### Passwords #####
 
-echo
-echo "Now set the password for $USERNAME:"
-ok=0
-for _ in 1 2 3; do
-  if run nixos-enter --root "$MNT" -c "passwd $USERNAME"; then ok=1; break; fi
-  echo "That did not work, please try again."
-done
-if (( ! ok )); then
-  warn "The password was not set. Do it by hand with: nixos-enter --root $MNT -c 'passwd $USERNAME'"
-fi
+# Sets a password in the new system. You type it twice; if they do not match, you simply try again.
+set_password() {  # set_password <account> <description>
+  local again
+  while true; do
+    echo
+    echo "Set the password for $2 (type it twice):"
+    if run nixos-enter --root "$MNT" -c "passwd $1"; then return 0; fi
+    echo "That did not work (the two passwords probably did not match)."
+    read -rp "Try again? [Y/n]: " again || again=n
+    if [[ "$again" =~ ^[nN] ]]; then
+      warn "The password for $1 was not set. Set it later with: nixos-enter --root $MNT -c 'passwd $1'"
+      return 0
+    fi
+  done
+}
+
+set_password root "root (the administrator account)"
+set_password "$USERNAME" "your user $USERNAME"
 
 # Add flake.lock and the new machine to Git right away, so you can commit them later
 if git -C "$CFG" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
