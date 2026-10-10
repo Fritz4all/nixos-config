@@ -19,3 +19,6 @@ id_dsa*
 id_ecdsa*
 id_ed25519*
 *password*
+
+# Local development and test tools; not needed for installing, so not on GitHub.
+dev/

@@ -1,2 +1,0 @@
-#!/bin/bash
-for x in nixos-system-laptop-26.05.20261008.7c8764b linux-6.18.55 systemd-260.5 gnome-shell-50.5 firefox-157.0.1 google-chrome-155.0.8059.39 brave-1.96.61 bitwarden-desktop-2026.8.0 vlc-3.0.24; do echo /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-$x; done

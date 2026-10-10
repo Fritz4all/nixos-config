@@ -12,6 +12,9 @@
 # The menu shows which steps are already done. Enter runs the next step,
 # 'a' runs all remaining steps one after another.
 #
+# At the start it checks that all tools it needs are present (git, curl, disk tools, nixos-install).
+# Missing tools are installed only when you agree, and only for this session (via nix-shell).
+#
 # Usage (in the NixOS installer, from a directory outside /mnt, e.g. /root/nixos-config):
 #   bash scripts/menu.sh [--dry-run]
 #   --dry-run     only show what would happen (can also be toggled in the menu)
@@ -68,6 +71,65 @@ ask_yes() {  # ask_yes "question" y|n  -> exit code 0 for yes
 
 pause() { echo; prompt "${D}Enter = back to the menu${N} "; }
 
+##### Required tools #####
+
+# "command:nix package that provides it"
+TOOLS=(git:git curl:curl lsblk:util-linux wipefs:util-linux findmnt:util-linux parted:parted
+       mkfs.fat:dosfstools mkfs.ext4:e2fsprogs cryptsetup:cryptsetup
+       nixos-install:nixos-install-tools nixos-enter:nixos-install-tools nixos-generate-config:nixos-install-tools)
+MISSING_CMDS=()
+MISSING_PKGS=()
+
+check_tools() {
+  local t c p
+  MISSING_CMDS=(); MISSING_PKGS=()
+  for t in "${TOOLS[@]}"; do
+    c="${t%%:*}"; p="${t#*:}"
+    command -v "$c" >/dev/null 2>&1 && continue
+    MISSING_CMDS+=("$c")
+    [[ " ${MISSING_PKGS[*]} " == *" $p "* ]] || MISSING_PKGS+=("$p")
+  done
+  return 0
+}
+
+# Asks whether missing tools may be installed. They are installed only for this session: the menu
+# restarts inside 'nix-shell -p <packages>'; nothing is added to the system permanently.
+offer_tools() {
+  local cmd
+  check_tools
+  (( ${#MISSING_CMDS[@]} == 0 )) && return 0
+  echo
+  echo "${Y}Missing tools:${N} ${MISSING_CMDS[*]}"
+  echo "They are needed for some steps (packages: ${MISSING_PKGS[*]})."
+  if [[ -n "${MENU_TOOLS_TRIED:-}" ]]; then
+    echo "They were already installed once in this session, but are still missing. Steps that need them may fail."
+    pause; return 0
+  fi
+  if ! command -v nix-shell >/dev/null 2>&1; then
+    echo "They cannot be installed automatically here (nix-shell is missing). Install them yourself."
+    pause; return 0
+  fi
+  if ! has_internet; then
+    echo "Installing them needs internet. Connect first (step 1), then press t in the menu."
+    pause; return 0
+  fi
+  if ! ask_yes "Install them now, only for this session?" y; then
+    echo "Not installed. Press t in the menu to change your mind."
+    pause; return 0
+  fi
+  cmd="$(printf '%q ' bash "$0" "${ORIG_ARGS[@]}")"
+  if (( DRY_RUN )); then
+    echo "+ nix-shell -p ${MISSING_PKGS[*]} --run \"$cmd\"   (dry run: not installed)"
+    pause; return 0
+  fi
+  echo "Installing ${MISSING_PKGS[*]} ... the menu then starts again."
+  if MENU_TOOLS_TRIED=1 nix-shell -p "${MISSING_PKGS[@]}" --run "$cmd"; then
+    exit 0   # the menu inside nix-shell has finished
+  fi
+  echo "${R}Installing the tools failed${N} (see the messages above)."
+  pause
+}
+
 ##### Status of each step #####
 
 declare -A DONE=()   # steps that succeeded in this session (needed for dry runs)
@@ -113,6 +175,7 @@ REPO_URL=""
 REPO_STATE=""   # text for the menu
 refresh() {
   local rc=0
+  check_tools
   ONLINE=0; has_internet && ONLINE=1
   REPO_URL="$(repo_url)"
   if [[ -z "$REPO_URL" ]]; then
@@ -187,6 +250,9 @@ draw() {
   printf '  %-11s %s\n' "UEFI" "$uefi" "Memory" "${ram:-?}"
   printf '  %-11s %s\n' "Internet" "$( (( ONLINE )) && echo "${G}yes${N}" || echo "${R}no${N}")"
   printf '  %-11s %s\n' "Repo" "$REPO_STATE"
+  if (( ${#MISSING_CMDS[@]} > 0 )); then
+    printf '  %-11s %s\n' "Tools" "${Y}missing: ${MISSING_CMDS[*]}${N} ${D}(t = install)${N}"
+  fi
   printf '  %-11s %s\n' "Desktop" "${desk:-${D}(no config yet)${N}}"
   if (( DRY_RUN )); then
     printf '  %-11s %s\n' "Mode" "${Y}DRY RUN${N} – nothing will be changed"
@@ -200,6 +266,8 @@ draw() {
   echo
   echo "  ${B}Enter${N} = run step $next   ${B}1-7${N} = choose a step   ${B}a${N} = run everything"
   echo "  ${B}d${N} = dry run $( (( DRY_RUN )) && echo off || echo on)   ${B}r${N} = refresh   ${B}q${N} = quit"
+  (( ${#MISSING_CMDS[@]} > 0 )) && echo "  ${B}t${N} = install missing tools"
+  return 0
   echo
 }
 
@@ -344,6 +412,8 @@ run_all() {
 ##### Main loop #####
 
 refresh
+offer_tools
+refresh
 while true; do
   draw
   prompt "Choice: "
@@ -363,6 +433,7 @@ while true; do
         DRY_RUN=$(( ! DRY_RUN )); DONE=()
       fi ;;
     r|R) refresh ;;
+    t|T) offer_tools; refresh ;;
     q|Q)  echo "Stopped. Continue later? Run again: bash $SELF_REPO/scripts/menu.sh"; exit 0 ;;
     *)    ;;
   esac

@@ -1,2 +1,0 @@
-#!/bin/bash
-case "$*" in *UUID*) echo aaaa-1111 ;; *SOURCE*) echo /dev/mapper/cryptroot ;; esac

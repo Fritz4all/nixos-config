@@ -1,4 +1,0 @@
-#!/bin/bash
-[[ "$1" == --parse ]] && exit 0
-e="${@: -1}"; re='import ([^)]*)\)\.([a-zA-Z]+)'; [[ "$e" =~ $re ]] || exit 1
-sed -n "s/^[[:space:]]*${BASH_REMATCH[2]}[[:space:]]*=[[:space:]]*\(\"[^\"]*\"\).*/\1/p" "${BASH_REMATCH[1]}"

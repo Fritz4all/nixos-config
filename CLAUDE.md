@@ -19,7 +19,9 @@ Flake configuration for NixOS 26.05 ("Yarara"), meant to be installed on several
 ## Layout
 - Needed for installing (on GitHub and the USB stick): `flake.nix`, `flake.lock` (after first install),
   `vars.nix`, `hosts/`, `modules/`, `scripts/`, `README.md`.
-- Not needed for installing: `dev/` (test tools), `CLAUDE.md`, `.gitignore`, `.githooks/`.
+- Not needed for installing: `docs/` (e.g. `github-setup.md`, how the repo was uploaded), `CLAUDE.md`,
+  `.gitignore`, `.githooks/`.
+- `dev/` (test tools) is **local only**: it is in `.gitignore` and not on GitHub (user's choice, 2026-10-10).
 - **No secrets in the repo (it is public).** Safeguards: `.gitignore` (secret file patterns),
   `.githooks/pre-commit` (blocks passwords, hashes, private keys, tokens; `allow-secret` comment to allow a line;
   `--all` scans the tree; enabled via `core.hooksPath`, which fetch-config.sh sets on new machines), and GitHub
@@ -38,11 +40,14 @@ Flake configuration for NixOS 26.05 ("Yarara"), meant to be installed on several
   3. `setup-user.sh`: asks username and full name, writes `vars.nix`, continues with install.sh
   4. `install.sh`: asks machine name, `new-host.sh`, `nixos-install --flake`, password, then `versions.sh`
   - `menu.sh`: installation menu calling the steps above (plus internet/Wi-Fi + repo status, versions, reboot).
+    At start it checks the required tools (`TOOLS` list, command:package) and **asks** before installing
+    missing ones, only for the session (re-runs itself in `nix-shell -p …`; `t` in the menu offers it again).
+    fetch-config.sh also asks before installing git (no = Local config). Never install anything unasked.
     Status per step is derived from /mnt (mounted, config, vars.nix, profile link). Enter = next step,
     `a` = everything. Calls scripts with `INSTALL_MENU=1` (no "next step" text), setup-user with
     `--no-continue`, install with `--no-reboot`. Step exit codes: 0 done, 1 failed, 2 skipped.
   - `new-host.sh` (create hosts/<name>) and `versions.sh` (show versions, also as the command `versions`)
-- `dev/`: `test-scripts.sh` (8 stub scenarios), `demo-menu.sh`, `check-config.sh` (flake check/eval,
+- `dev/` (local only): `test-scripts.sh` (21 checks), `demo-menu.sh`, `check-config.sh` (flake check/eval,
   `--build`, `--vm`), `testvm/` (fake host), `stubs/` (fake installer commands).
 
 ## Conventions
@@ -61,7 +66,7 @@ Flake configuration for NixOS 26.05 ("Yarara"), meant to be installed on several
   Firefox 157.0.1, Chrome 155.0.8059.39, Brave 1.96.61, Bitwarden 2026.8.0, VLC 3.0.24, Nix 2.34.8.
   A GNOME VM was started (`system.build.vm`; GNOME autologin needs getty@tty1/autovt@tty1 disabled).
 - `versions.sh` tested against the really built system (`nix-instantiate --raw` was replaced: older Nix lacks it).
-- All scripts and the menu tested with stubs (`dev/test-scripts.sh`: 8 menu scenarios + 10 secret-check cases, all pass), including the repo check
+- All scripts and the menu tested with stubs (`dev/test-scripts.sh`: menu scenarios, missing-tool prompts, secret-check cases; 21 checks, all pass), including the repo check
   against real GitHub URLs (existing repo → 0, missing repo → curl exit 22).
 - The "attach a local copy to GitHub" flow in README 3.5 (`git fetch` + `git reset --soft origin/main` on an
   unborn branch) was tested with real git.

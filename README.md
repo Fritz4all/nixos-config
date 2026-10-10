@@ -20,14 +20,14 @@ nixos-config/
 ├── modules/         │
 ├── scripts/         ┘
 │
-├── dev/             testing tools; on GitHub, but not needed for installing
+├── docs/            extra manuals (e.g. how the repo was put on GitHub); not needed for installing
 ├── CLAUDE.md        notes for the AI assistant (Claude Code); not needed for installing
 ├── .githooks/       blocks commits that contain passwords, keys or tokens (see "Keeping secrets out")
 └── .gitignore       tells Git which files to leave out (build results, test files, secret files)
 ```
 
 **Simple rule:** upload the whole folder to GitHub, and copy the whole folder to the USB stick.
-`dev/` and `CLAUDE.md` are small and harmless; you may leave them off the USB stick if you like.
+`docs/` and `CLAUDE.md` are small and harmless; you may leave them off the USB stick if you like.
 
 | Part | What it is |
 |---|---|
@@ -46,7 +46,6 @@ nixos-config/
 | `scripts/install.sh` | ask for the machine name, run `nixos-install`, set your password, show the versions |
 | `scripts/new-host.sh` | create `hosts/<name>/` (used by `install.sh`) |
 | `scripts/versions.sh` | show the versions of the system and your programs (later also as the command `versions`) |
-| `dev/` | test tools, see [dev/README.md](dev/README.md) |
 
 Shared = everything in `vars.nix` and `modules/`. Different per machine = only its directory in `hosts/`.
 
@@ -76,58 +75,10 @@ agenix: those store secrets encrypted, so only your machines can read them.
 
 ---
 
-## Part 1: Upload the config to GitHub (once)
+## Part 1: Put the config on a USB stick
 
-You do this on your current computer (Ubuntu). After this, any machine can download the config.
-There are no secrets in this folder (passwords live in Bitwarden), so a **public** repo is fine and the
-installer can download it without logging in.
-
-1. **Install Git and the GitHub tool.** Open a terminal and type:
-   ```bash
-   sudo apt install git gh
-   ```
-2. **Log in to GitHub.** Choose *GitHub.com*, *HTTPS*, *Yes* (authenticate Git) and *Login with a web browser*,
-   then follow the instructions in the browser:
-   ```bash
-   gh auth login
-   ```
-3. **Tell Git who you are** (once per computer). Use your own name; the e-mail address may be the private
-   address GitHub gives you (Settings → Emails):
-   ```bash
-   git config --global user.name "Your Name"
-   git config --global user.email "you@example.com"
-   ```
-4. **Fill in the GitHub address.** Open `vars.nix` in a text editor and change the line `repoUrl = "";` into
-   (with your GitHub username):
-   ```nix
-   repoUrl = "https://github.com/YOURNAME/nixos-config.git";
-   ```
-5. **Create the repo and upload.** In the terminal, go to the folder and run:
-   ```bash
-   cd ~/Documents/Claude/nixos-config
-   git init -b main
-   git add -A
-   git commit -m "First version"
-   gh repo create nixos-config --public --source=. --push
-   ```
-6. **Turn on the secret check** (see "Keeping secrets out"):
-   ```bash
-   git config core.hooksPath .githooks
-   ```
-7. **Check.** Open `https://github.com/YOURNAME/nixos-config` in your browser; you should see the files.
-
-Later changes are uploaded with:
-```bash
-git add -A
-git commit -m "Describe what you changed"
-git push
-```
-
----
-
-## Part 2: Put the config on a USB stick
-
-Needed when the computer you install on has no internet yet, or when the config is not on GitHub yet.
+Only needed when the computer you install on has no internet. With internet, the config is downloaded
+from GitHub (see 2.3 B). How the repo was put on GitHub: [docs/github-setup.md](docs/github-setup.md).
 
 You need **two USB sticks**: one for the NixOS installer (writing the installer erases that stick and makes it
 read-only), and one for the config. Any stick will do for the config; it only needs a few hundred kilobytes.
@@ -138,18 +89,18 @@ read-only), and one for the config. Any stick will do for the config; it only ne
 
 ---
 
-## Part 3: Install a machine
+## Part 2: Install a machine
 
-### 3.1 Make the installer USB stick
+### 2.1 Make the installer USB stick
 Download the **Graphical ISO** of NixOS 26.05 from <https://nixos.org/download> and write it to a USB stick
 (e.g. with balenaEtcher). Turn **Secure Boot off** in the BIOS: this config uses systemd-boot without Secure Boot.
 Start the computer from the stick (usually F12, F2 or Esc during startup) and choose the stick under UEFI.
 
-### 3.2 Internet and terminal
+### 2.2 Internet and terminal
 In the live environment, pick your Wi-Fi network at the top right (or plug in a network cable).
 Installing downloads packages, so it needs internet. Then open a terminal (Console).
 
-### 3.3 Get the config folder
+### 2.3 Get the config folder
 Choose **one** of the two ways.
 
 **A. From the USB stick.** Plug in the config stick and click it once in the file manager (Files), so it is
@@ -162,11 +113,11 @@ cp -r /run/media/nixos/*/nixos-config /root/
 **B. From GitHub** (needs internet, no Git needed):
 ```bash
 sudo -i
-curl -L https://github.com/YOURNAME/nixos-config/archive/refs/heads/main.tar.gz | tar xz -C /root
+curl -L https://github.com/Fritz4all/nixos-config/archive/refs/heads/main.tar.gz | tar xz -C /root
 mv /root/nixos-config-main /root/nixos-config
 ```
 
-### 3.4 Run the installation menu
+### 2.4 Run the installation menu
 ```bash
 bash /root/nixos-config/scripts/menu.sh
 ```
@@ -180,7 +131,7 @@ The menu shows all steps. Steps that are done get a ✔, and ▶ points to the n
   UEFI        yes
   Memory      16 GB
   Internet    yes
-  Repo        can be downloaded (https://github.com/YOURNAME/nixos-config.git)
+  Repo        can be downloaded (https://github.com/Fritz4all/nixos-config.git)
   Desktop     (no config yet)
 
      ✔ 1  Internet connection    connected
@@ -199,6 +150,9 @@ The menu shows all steps. Steps that are done get a ✔, and ▶ points to the n
   (for example to redo one).
 - **d** (or `--dry-run`) is a dry run: everything is shown, nothing is changed. Handy to look around first.
 - You can quit (**q**) and start the menu again at any time; it sees by itself which steps are done.
+- At the start the menu checks that every tool it needs is there (git, curl, disk tools, `nixos-install`).
+  If something is missing it **asks** whether it may install it. It is then installed only for this session
+  (with `nix-shell`; nothing is added permanently). Said no? Press **t** in the menu to install later.
 
 What each step does:
 
@@ -206,7 +160,7 @@ What each step does:
 |---|---|
 | 1. Internet connection | Checks internet and whether your repo can be downloaded (the **Repo** line). No internet? It offers to set up Wi-Fi with `nmtui`. |
 | 2. Prepare disk | Lists the disks (number, size, SSD/HDD, connection, model). The USB stick you booted from cannot be chosen. You type the disk's name to confirm, choose encryption (recommended, default yes) and type a passphrase twice. Creates an EFI partition of 1 GiB and a system partition with the rest, and mounts them on `/mnt`. **Everything on that disk is erased.** |
-| 3. Fetch config | Puts the config in `/mnt/etc/nixos`. **Download config** (git clone from GitHub) when the repo can be downloaded, otherwise **Local config** (a copy of the folder from 3.3). It always says which one and why, and you can override it (`1` or `2`). |
+| 3. Fetch config | Puts the config in `/mnt/etc/nixos`. **Download config** (git clone from GitHub) when the repo can be downloaded, otherwise **Local config** (a copy of the folder from 2.3). It always says which one and why, and you can override it (`1` or `2`). |
 | 4. Set up user | Asks for your username and full name and writes them to `vars.nix`. Enter keeps the current value. |
 | 5. Install | Asks for the machine name (e.g. `laptop`), detects the hardware, runs `nixos-install` (10 to 30 minutes), asks for a root password and your user password, and shows the versions. |
 | 6. Show versions | Shows the versions again: NixOS, kernel, systemd, desktop, Firefox, Chrome, Brave, Bitwarden, VLC. |
@@ -218,7 +172,7 @@ If the installation fails halfway (e.g. a network error), choose step 5 again an
 name. If you repartitioned the disk, choose **2 (Recreate)**; the script stops by itself when the hardware
 configuration does not match the mounted disk.
 
-### 3.5 After the first start: save the new machine to GitHub
+### 2.5 After the first start: save the new machine to GitHub
 The installation created `hosts/<name>/` and `flake.lock`. Save them, so other machines get the same versions.
 In a terminal, logged in as yourself:
 
@@ -245,7 +199,7 @@ git add -A
 git commit -m "Add machine laptop"
 git push -u origin main
 ```
-(No `origin` yet? Add it first: `git remote add origin https://github.com/YOURNAME/nixos-config.git`.)
+(No `origin` yet? Add it first: `git remote add origin https://github.com/Fritz4all/nixos-config.git`.)
 
 From now on you change the config in `/etc/nixos` and apply it with `rebuild`.
 
@@ -253,7 +207,7 @@ From now on you change the config in `/etc/nixos` and apply it with `rebuild`.
 
 ## Adding another machine
 
-Same recipe as Part 3, with a **new, unique name** in step 5 (e.g. `workpc`). Then save it (3.5).
+Same recipe as Part 2, with a **new, unique name** in step 5 (e.g. `workpc`). Then save it (2.5).
 Tip: first update the versions on an existing machine, so the new machine gets fresh packages
 (see "Google Chrome cannot be downloaded" below):
 ```bash

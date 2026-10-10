@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Fake nixos-install: creates the system profile link like a real installation does.
-echo "[stub] nixos-install $*"
-p="$MNT/nix/var/nix/profiles"; mkdir -p "$p"
-ln -sfn /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-laptop-26.05.20261008.7c8764b "$p/system-1-link"
-ln -sfn system-1-link "$p/system"

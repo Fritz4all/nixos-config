@@ -85,14 +85,16 @@ check_internet() {
   curl -fsS --max-time 6 -o /dev/null https://cache.nixos.org/nix-cache-info >/dev/null 2>&1
 }
 
-# Makes sure git is available. If not, the script restarts itself inside 'nix-shell -p git'.
+# Makes sure git is available. If not, it asks whether git may be installed; if yes, the script
+# restarts itself inside 'nix-shell -p git' (only for this session, nothing is installed permanently).
 ensure_git() {
   command -v git >/dev/null 2>&1 && return 0
-  if [[ -z "${FETCH_CONFIG_REEXEC:-}" ]] && command -v nix-shell >/dev/null 2>&1; then
-    echo "git is missing; fetching it temporarily via nix-shell ..."
-    FETCH_CONFIG_REEXEC=1 exec nix-shell -p git --run "$(printf '%q ' bash "$0" "${ORIG_ARGS[@]}")"
-  fi
-  return 1
+  [[ -z "${FETCH_CONFIG_REEXEC:-}" ]] && command -v nix-shell >/dev/null 2>&1 || return 1
+  echo "git is needed to download the config, but it is not installed."
+  ask_yes "Install git now (only for this session)?" y || return 1
+  if (( DRY_RUN )); then echo "+ nix-shell -p git   (dry run: not installed)"; return 1; fi
+  echo "Installing git ..."
+  FETCH_CONFIG_REEXEC=1 exec nix-shell -p git --run "$(printf '%q ' bash "$0" "${ORIG_ARGS[@]}")"
 }
 
 # Order: --url / NIXOS_CONFIG_URL, the 'origin' of this repo, repoUrl in vars.nix.
@@ -238,7 +240,11 @@ do_download() {
     fi
     URL="$REPLY"
   fi
-  ensure_git || die "git is not available and cannot be fetched."
+  if ! ensure_git; then
+    echo "Without git the config cannot be downloaded; using Local config instead."
+    do_local
+    return 0
+  fi
   RESULT_LABEL="Download config"
   RESULT_FROM="$URL"
   prepare_dest
