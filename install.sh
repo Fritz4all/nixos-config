@@ -518,8 +518,26 @@ run_all() {
   done
 }
 
+##### Not in the installer? #####
+
+# The menu is meant for the NixOS installer (live USB/ISO), whose root file system lives in memory (tmpfs). On an
+# installed system (root on a disk) it warns first: installing from there is not what you usually want, and tools
+# like parted are missing. Use create-config.sh there to make a config from this machine's hardware.
+check_live_system() {
+  local fstype
+  [[ "$MNT" == /mnt && -z "${INSTALL_ANY_SYSTEM:-}" ]] || return 0
+  fstype="$(findmnt -no FSTYPE / 2>/dev/null || true)"
+  [[ -z "$fstype" || "$fstype" == tmpfs || "$fstype" == overlay ]] && return 0
+  echo
+  echo "${Y}This is not the NixOS installer but an installed system${N} (/ is $fstype on a disk)."
+  echo "The installation menu is meant to be started from the NixOS installer (USB stick or your own ISO)."
+  echo "To make a config from this machine's hardware, use instead:  bash $SELF_REPO/create-config.sh"
+  ask_yes "Continue with the installation menu anyway?" n || { echo "Stopped."; exit 0; }
+}
+
 ##### Main loop #####
 
+check_live_system
 refresh
 offer_tools
 refresh
