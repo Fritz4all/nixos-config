@@ -26,6 +26,8 @@ in
 
   # Tools used by the installation menu
   environment.systemPackages = with pkgs; [ git gnome-console ];
+  # No GNOME welcome tour on top of the installer
+  environment.gnome.excludePackages = [ pkgs.gnome-tour ];
 
   # Start the installation menu in a terminal as soon as the live session is up
   environment.etc."xdg/autostart/nixos-config-installer.desktop".text = ''
