@@ -200,7 +200,10 @@ if (( OFFLINE_ISO )) && [[ -n "$SYSTEM_PATH" ]]; then
   run "${NIXF[@]}" flake archive --offline --no-check-sigs --to "$MNT" "$CFG"
   run "${NIXF[@]}" copy --offline --no-check-sigs --to "$MNT" "$SYSTEM_PATH"
 fi
-run nixos-install --no-root-passwd --flake "$CFG#$VARIANT"
+# --no-channel-copy: this config uses flakes only (nix.channel.enable = false); copying the installer's channels
+# only causes "channels exist, but channels have been disabled" warnings on the new system
+run nixos-install --no-root-passwd --no-channel-copy --flake "$CFG#$VARIANT"
+run rm -rf "$MNT/root/.nix-defexpr/channels"
 
 trap - ERR
 
