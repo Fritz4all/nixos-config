@@ -380,7 +380,9 @@ on one machine of that type:
 bash create-config.sh
 ```
 
-It shows the machine (vendor, model) and its existing configs, asks for the desktop, apps (Minimal by default),
+It shows the machine (vendor, model) and its existing configs. When there is one already, it offers to **update
+it** with this machine's hardware (your own settings in it stay; you see the changes first), or to make a new one.
+For a new config it asks for the desktop, apps (Minimal by default),
 disk encryption and a name, detects the hardware, checks the config with Nix and offers to push it to GitHub.
 It works in the NixOS installer, on an installed NixOS and on another Linux with Nix (e.g. Ubuntu). Everything
 about it, including all options: [docs/create-config.md](docs/create-config.md).

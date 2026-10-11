@@ -48,7 +48,16 @@ It runs as your normal user; root is not needed.
    Vendor, model and kind come from the firmware, the same way the installer reads them, so the installer
    will recognise this type later. Existing configs of this type are listed, so you do not make a double one.
 
-2. **Asks four questions** (Enter takes the value between brackets):
+   When there are existing configs for this type, it asks first:
+   ```
+   What do you want to do?
+     1) Update an existing config with the hardware of this machine (your own settings in it stay)
+     2) Create a new config for this type (e.g. with another desktop)
+   ```
+   Choose **1** to refresh a config (see [Updating an existing config](#updating-an-existing-config)); with
+   several configs it then asks which one. Choose **2** for a new config, e.g. a KDE Plasma version next to GNOME.
+
+2. **Asks four questions** for a new config (Enter takes the value between brackets):
 
    | Question | Choices | Default |
    |---|---|---|
@@ -98,6 +107,7 @@ All questions can also be answered on the command line, e.g. for a script:
 | `--apps minimal` / `--apps full` | apps, without asking |
 | `--encrypted yes` / `--encrypted no` | disk encryption, without asking |
 | `--name NAME` | name of the config, without asking |
+| `--update NAME` | update the existing config NAME with this machine's hardware, without asking |
 | `--no-push` | do not offer to save it to GitHub |
 | `--dry-run` | only show what would happen; nothing is created |
 | `-h` | short help |
@@ -106,6 +116,28 @@ Example: a KDE Plasma config with all apps, without questions and without pushin
 ```bash
 bash create-config.sh --desktop plasma --apps full --encrypted yes --name lenovo-thinkpad-t14-gen-3-plasma --no-push
 ```
+
+## Updating an existing config
+
+Use this when the project has learned to detect more hardware (e.g. video cards or a fingerprint reader), or when
+you want to check that a config still matches the machines of its type. Run `bash create-config.sh` on a machine of
+that type and choose **1**, or directly: `bash create-config.sh --update dell-precision-7540-gnome-minimal`.
+
+What happens:
+
+| Part | On update |
+|---|---|
+| `hardware-configuration.nix`, `machine.nix` | made again from this machine |
+| blocks in `default.nix` whose comment says `added by new-host.sh` (GPU, Logitech, fingerprint, …) and the nixos-hardware line | replaced by what is detected now |
+| everything else in `default.nix`: desktop, apps, encryption, `stateVersion`, your own settings | stays as it is |
+
+Then it shows the changes (`-` old, `+` new) and asks **"Keep these changes?"**. Answer `n` and the config is put
+back exactly as it was. If nothing changed, it says so and stops. After that the usual Nix check and the offer to
+push (commit message "Update config …").
+
+Tip: if you changed a detected setting by hand (e.g. `my.nvidia.open`), an update puts the detected value back; you
+will see that in the changes and can answer `n`. To keep a manual change for good, move it out of the detected block
+to a line below `# Overrides for this variant only` and remove the line from the block.
 
 ## After creating it
 

@@ -13,11 +13,16 @@
 # For tests the hardware can be faked: DMI_DIR, USB_SYSFS, PCI_SYSFS, TB_SYSFS, IIO_SYSFS, CPUINFO, NIXOS_HARDWARE_LIST.
 # Afterwards it updates the overview in hosts/README.md.
 #
+# With --update it refreshes an existing config instead: hardware-configuration.nix and machine.nix are made
+# again, and in default.nix only the blocks marked "added by new-host.sh" are replaced by what is detected now;
+# everything else (desktop, apps, encryption, stateVersion, your own settings) stays as it is.
+#
 # Usage: bash scripts/new-host.sh <variant> [options]
 #   --root DIR          where the new system is mounted (default /mnt, as in the installer)
 #   --desktop NAME      gnome or plasma (default: desktop in vars.nix)
 #   --apps SET          full or minimal (default: desktopApps in vars.nix)
 #   --encrypted yes|no  disk encryption (default: detected from the disk mounted on --root)
+#   --update            refresh the existing config <variant> with the hardware of this machine
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,6 +31,7 @@ NAME=""
 DESKTOP=""
 APPS=""
 ENCRYPTED=""
+UPDATE=0
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -35,6 +41,7 @@ while [[ $# -gt 0 ]]; do
     --desktop)   DESKTOP="${2:?--desktop needs gnome or plasma}"; shift 2 ;;
     --apps)      APPS="${2:?--apps needs full or minimal}"; shift 2 ;;
     --encrypted) ENCRYPTED="${2:?--encrypted needs yes or no}"; shift 2 ;;
+    --update)    UPDATE=1; shift ;;
     -h|--help)   sed -n '2,/^set -/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)          die "Unknown option: $1" ;;
     *)           NAME="$1"; shift ;;
@@ -44,36 +51,65 @@ done
 [[ -n "$NAME" ]] || die "Usage: bash scripts/new-host.sh <variant> [--root /mnt] [--desktop gnome|plasma] [--apps full|minimal]"
 [[ "$NAME" =~ ^[a-z][a-z0-9-]{0,62}$ ]] || die "Invalid name '$NAME': use lowercase letters, digits and hyphens, starting with a letter."
 DEST="$REPO/hosts/$NAME"
-[[ -e "$DEST" ]] && die "hosts/$NAME already exists. Choose another name or remove that directory first."
+if (( UPDATE )); then
+  [[ -f "$DEST/default.nix" ]] || die "hosts/$NAME does not exist, so it cannot be updated."
+else
+  [[ -e "$DEST" ]] && die "hosts/$NAME already exists. Choose another name or remove that directory first."
+fi
 
 # shellcheck source=machine-info.sh
 source "$REPO/scripts/machine-info.sh"
 
 var_of() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$REPO/vars.nix" | head -n 1; }
-[[ -n "$DESKTOP" ]] || DESKTOP="$(var_of desktop)"
-[[ -n "$APPS" ]] || APPS="$(var_of desktopApps)"
-[[ "$DESKTOP" == gnome || "$DESKTOP" == plasma ]] || die "--desktop must be gnome or plasma."
-[[ "$APPS" == full || "$APPS" == minimal ]] || die "--apps must be full or minimal."
-if [[ -z "$ENCRYPTED" ]]; then
-  ENCRYPTED=no
-  [[ "$(findmnt -no SOURCE "$ROOT" 2>/dev/null || true)" == /dev/mapper/cryptroot ]] && ENCRYPTED=yes
+nix_value() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\{0,1\}\([^\";]*\)\"\{0,1\};.*/\1/p" "$DEST/default.nix" | head -n 1; }
+
+# Removes from a default.nix what new-host.sh added earlier: the blocks whose comment says "added by new-host.sh"
+# (up to the next empty line) and the nixos-hardware import line; then tidies the empty lines before the final }.
+strip_detected() {
+  awk '
+    skip && (/^[[:space:]]*$/ || /^}/) { skip = 0 }
+    skip { next }
+    /^[[:space:]]*#.*added by new-host\.sh/ { skip = 1; next }
+    /nixosModules\..*added by new-host\.sh/ { next }
+    { print }
+  ' "$1" | cat -s | awk '{ l[NR] = $0 } END { for (i = 1; i <= NR; i++) if (!(l[i] ~ /^[[:space:]]*$/ && l[i + 1] ~ /^}/)) print l[i] }'
+}
+
+if (( UPDATE )); then
+  # Keep the choices of the existing config (only used for the messages below)
+  DESKTOP="$(nix_value my.desktop)"; APPS="$(nix_value my.desktopApps)"
+  ENCRYPTED="$([[ "$(nix_value my.disk.encrypted)" == true ]] && echo yes || echo no)"
+  STATE_VERSION="$(nix_value system.stateVersion)"
+  BACKUP="$(mktemp -d)"
+  cp -a "$DEST/." "$BACKUP/"
+  trap 'echo "Failed; hosts/'"$NAME"' is put back as it was." >&2; rm -rf "$DEST"; mkdir -p "$DEST"; cp -a "$BACKUP/." "$DEST/"; rm -rf "$BACKUP"' ERR
+  strip_detected "$BACKUP/default.nix" > "$DEST/default.nix"
+else
+  [[ -n "$DESKTOP" ]] || DESKTOP="$(var_of desktop)"
+  [[ -n "$APPS" ]] || APPS="$(var_of desktopApps)"
+  [[ "$DESKTOP" == gnome || "$DESKTOP" == plasma ]] || die "--desktop must be gnome or plasma."
+  [[ "$APPS" == full || "$APPS" == minimal ]] || die "--apps must be full or minimal."
+  if [[ -z "$ENCRYPTED" ]]; then
+    ENCRYPTED=no
+    [[ "$(findmnt -no SOURCE "$ROOT" 2>/dev/null || true)" == /dev/mapper/cryptroot ]] && ENCRYPTED=yes
+  fi
+  case "$ENCRYPTED" in yes) NIX_ENC=true ;; no) NIX_ENC=false ;; *) die "--encrypted must be yes or no." ;; esac
+
+  # stateVersion = the NixOS release this variant is first installed with (format YY.MM).
+  # Taken from flake.nix; for nixos-unstable from the installer that is running now.
+  STATE_VERSION="$(sed -n 's/.*inputs\.nixpkgs\.url.*nixos-\([0-9][0-9]\.[0-9][0-9]\)".*/\1/p' "$REPO/flake.nix" | head -n 1)"
+  if [[ ! "$STATE_VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]]; then
+    STATE_VERSION="$(nixos-version 2>/dev/null | cut -d. -f1,2 || true)"
+  fi
+  [[ "$STATE_VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]] \
+    || die "Cannot determine the NixOS release for system.stateVersion (no release in flake.nix, no nixos-version)."
+
+  mkdir -p "$DEST"
+  trap 'echo "Failed; hosts/'"$NAME"' is removed again." >&2; rm -rf "$DEST"' ERR
+
+  sed -e "s/@STATE_VERSION@/$STATE_VERSION/" -e "s/@DESKTOP@/$DESKTOP/" -e "s/@APPS@/$APPS/" -e "s/@ENCRYPTED@/$NIX_ENC/" \
+    "$REPO/hosts/_template/default.nix" > "$DEST/default.nix"
 fi
-case "$ENCRYPTED" in yes) NIX_ENC=true ;; no) NIX_ENC=false ;; *) die "--encrypted must be yes or no." ;; esac
-
-# stateVersion = the NixOS release this variant is first installed with (format YY.MM).
-# Taken from flake.nix; for nixos-unstable from the installer that is running now.
-STATE_VERSION="$(sed -n 's/.*inputs\.nixpkgs\.url.*nixos-\([0-9][0-9]\.[0-9][0-9]\)".*/\1/p' "$REPO/flake.nix" | head -n 1)"
-if [[ ! "$STATE_VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]]; then
-  STATE_VERSION="$(nixos-version 2>/dev/null | cut -d. -f1,2 || true)"
-fi
-[[ "$STATE_VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]] \
-  || die "Cannot determine the NixOS release for system.stateVersion (no release in flake.nix, no nixos-version)."
-
-mkdir -p "$DEST"
-trap 'echo "Failed; hosts/'"$NAME"' is removed again." >&2; rm -rf "$DEST"' ERR
-
-sed -e "s/@STATE_VERSION@/$STATE_VERSION/" -e "s/@DESKTOP@/$DESKTOP/" -e "s/@APPS@/$APPS/" -e "s/@ENCRYPTED@/$NIX_ENC/" \
-  "$REPO/hosts/_template/default.nix" > "$DEST/default.nix"
 
 # Vendor, model and kind (no machine name or serial number: those stay on the machine itself)
 nix_str() { local v="$1"; v="${v//\\/\\\\}"; v="${v//\"/\\\"}"; v="${v//\$/\\\$}"; printf '"%s"' "$v"; }
@@ -256,6 +292,8 @@ if [[ "$VIRT" == "" || "$VIRT" == none ]]; then
     HW=""
     for c in "${candidates[@]}"; do grep -qx "$c" <<<"$PROFILES" && { HW="$c"; break; }; done
     if [[ -n "$HW" ]]; then
+      grep -q 'nixos-hardware, \.\.\. }:' "$DEST/default.nix" \
+        || sed -i '1,/^{.*}:$/ s/^{ \(.*\), \.\.\. }:$/{ \1, nixos-hardware, ... }:/' "$DEST/default.nix"
       sed -i "/\.\/machine\.nix/a\\    nixos-hardware.nixosModules.$HW  # fixes for this model (github.com/NixOS/nixos-hardware), added by new-host.sh" "$DEST/default.nix"
       echo "nixos-hardware has a profile for this model: $HW (added to the config)."
     else
@@ -265,6 +303,7 @@ if [[ "$VIRT" == "" || "$VIRT" == none ]]; then
 fi
 
 trap - ERR
+(( UPDATE )) && rm -rf "$BACKUP"
 
 bash "$REPO/scripts/hosts-overview.sh" >/dev/null || echo "Note: hosts/README.md could not be updated." >&2
 
@@ -276,4 +315,5 @@ else
 fi
 
 echo
+(( UPDATE )) && echo "Done: hosts/$NAME has been updated with the hardware of this machine ($VENDOR $MODEL, $DESKTOP $APPS, encrypted: $ENCRYPTED, stateVersion $STATE_VERSION)." && exit 0
 echo "Done: hosts/$NAME has been created ($VENDOR $MODEL, $DESKTOP $APPS, encrypted: $ENCRYPTED, stateVersion $STATE_VERSION)."
