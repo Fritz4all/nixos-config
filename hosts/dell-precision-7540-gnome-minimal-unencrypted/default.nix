@@ -26,4 +26,13 @@
 
   # Logitech device found (USB Receiver): Solaar with button rules, added by new-host.sh.
   my.logitech.enable = true;
+
+  # Intel GPU found (Intel Corporation CoffeeLake-H GT2 [UHD Graphics 630] (rev 02)): video acceleration, added by new-host.sh.
+  my.intelGpu = true;
+
+  # NVIDIA GPU found (NVIDIA Corporation TU117GLM [Quadro T1000 Mobile] (rev a1)): NVIDIA driver with PRIME offload (hybrid graphics; start programs on the NVIDIA card with nvidia-offload), added by new-host.sh.
+  my.nvidia.enable = true;
+  my.nvidia.open = true;  # true: Turing or newer; false: an older card
+  my.nvidia.prime.intelBusId = "PCI:0:2:0";
+  my.nvidia.prime.nvidiaBusId = "PCI:1:0:0";
 }

@@ -6,6 +6,8 @@
 # In a virtual machine it also turns on the guest tools for that kind of VM (QEMU/KVM, VMware); NixOS's own
 # hardware detection already handles VirtualBox, Hyper-V and Parallels.
 # With a Logitech receiver or mouse attached it turns on Solaar with the button rules (my.logitech.enable).
+# Video cards (nixos-generate-config does not look at them): Intel → video acceleration (my.intelGpu); NVIDIA → the
+# NVIDIA driver (my.nvidia), with PRIME offload when there is also an Intel or AMD GPU (hybrid laptops).
 # Afterwards it updates the overview in hosts/README.md.
 #
 # Usage: bash scripts/new-host.sh <variant> [options]
@@ -127,6 +129,48 @@ if [[ -n "$LOGI" ]]; then
   add_to_host "Logitech device found ($LOGI): Solaar with button rules, added by new-host.sh." \
 "  my.logitech.enable = true;"
   echo "Logitech device detected ($LOGI): Solaar with the button rules is turned on for this variant."
+fi
+
+# Video cards: PCI class 0x03xxxx (display controllers), read from /sys (no lspci needed)
+pci_bus_id() {  # 0000:01:00.0 -> PCI:1:0:0 (decimal, as NixOS expects)
+  local a="${1#*:}" bus dev fn
+  bus="${a%%:*}"; a="${a#*:}"; dev="${a%%.*}"; fn="${a#*.}"
+  printf 'PCI:%d:%d:%d' "$((16#$bus))" "$((16#$dev))" "$((16#$fn))"
+}
+INTEL_GPU=""; AMD_GPU=""; NVIDIA_GPU=""; NVIDIA_DEV=""
+for d in "${PCI_SYSFS:-/sys/bus/pci/devices}"/*; do
+  [[ -f "$d/class" && "$(cat "$d/class")" == 0x03* ]] || continue
+  case "$(cat "$d/vendor" 2>/dev/null)" in
+    0x8086) [[ -n "$INTEL_GPU" ]] || INTEL_GPU="$(basename "$d")" ;;
+    0x1002) [[ -n "$AMD_GPU" ]] || AMD_GPU="$(basename "$d")" ;;
+    0x10de) [[ -n "$NVIDIA_GPU" ]] || { NVIDIA_GPU="$(basename "$d")"; NVIDIA_DEV="$(cat "$d/device" 2>/dev/null)"; } ;;
+  esac
+done
+gpu_name() {  # readable name via lspci when available
+  command -v lspci >/dev/null 2>&1 && lspci -s "$1" 2>/dev/null | sed 's/^[^:]*: *//; s/^[^:]*: *//' | head -n 1
+  return 0
+}
+if [[ -n "$INTEL_GPU" ]]; then
+  add_to_host "Intel GPU found ($(gpu_name "$INTEL_GPU")): video acceleration, added by new-host.sh." \
+"  my.intelGpu = true;"
+fi
+if [[ -n "$NVIDIA_GPU" ]]; then
+  # Turing and newer (device id 0x1e00 and up: GTX 16xx, RTX, Quadro T/RTX) use NVIDIA's open kernel modules
+  NV_OPEN=false; (( 16#${NVIDIA_DEV#0x} >= 16#1e00 )) && NV_OPEN=true
+  block="  my.nvidia.enable = true;
+  my.nvidia.open = $NV_OPEN;  # true: Turing or newer; false: an older card"
+  note="NVIDIA driver"
+  if [[ -n "$INTEL_GPU" || -n "$AMD_GPU" ]]; then
+    note="NVIDIA driver with PRIME offload (hybrid graphics; start programs on the NVIDIA card with nvidia-offload)"
+    [[ -n "$INTEL_GPU" ]] && block+="
+  my.nvidia.prime.intelBusId = \"$(pci_bus_id "$INTEL_GPU")\";"
+    [[ -n "$AMD_GPU" && -z "$INTEL_GPU" ]] && block+="
+  my.nvidia.prime.amdgpuBusId = \"$(pci_bus_id "$AMD_GPU")\";"
+    block+="
+  my.nvidia.prime.nvidiaBusId = \"$(pci_bus_id "$NVIDIA_GPU")\";"
+  fi
+  add_to_host "NVIDIA GPU found ($(gpu_name "$NVIDIA_GPU")): $note, added by new-host.sh." "$block"
+  echo "NVIDIA GPU detected ($(gpu_name "$NVIDIA_GPU")): $note."
 fi
 
 trap - ERR

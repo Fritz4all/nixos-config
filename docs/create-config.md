@@ -66,14 +66,16 @@ It runs as your normal user; root is not needed.
 
    | File | Contents |
    |---|---|
-   | `hosts/<config>/default.nix` | desktop, apps, disk encryption, NixOS release (`stateVersion`) |
+   | `hosts/<config>/default.nix` | desktop, apps, disk encryption, NixOS release (`stateVersion`), detected extras (GPU, Logitech, VM) |
    | `hosts/<config>/machine.nix` | vendor, model and kind; the installer recognises the type by it |
    | `hosts/<config>/hardware-configuration.nix` | the detected hardware |
    | `hosts/README.md` | the overview of all configs, updated |
 
    On top of that, automatically: in a **virtual machine** the guest tools (shared clipboard, screen size), and
-   with a **Logitech receiver or mouse** attached Solaar with the button rules. No machine name or serial number
-   is stored.
+   with a **Logitech receiver or mouse** attached Solaar with the button rules, and the **video cards** (the standard
+   NixOS hardware detection leaves them out): Intel → video acceleration, NVIDIA → the NVIDIA driver, and on a
+   laptop with two GPUs PRIME offload (start a program on the NVIDIA card with `nvidia-offload <program>`).
+   No machine name or serial number is stored.
 
 4. **Checks the config with Nix**: "OK: the config is valid."
 

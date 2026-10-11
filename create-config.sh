@@ -9,7 +9,7 @@
 #   1. shows this machine (vendor, model, kind) and the configs that already exist for its type
 #   2. asks for the desktop (GNOME / KDE Plasma), its apps (Minimal / Full), disk encryption and the config name
 #   3. detects the hardware (nixos-generate-config, without disks) and creates the config with scripts/new-host.sh
-#      (including guest tools in a VM, and Solaar when a Logitech receiver or mouse is attached)
+#      (including guest tools in a VM, Solaar when a Logitech receiver or mouse is attached, and the video cards)
 #   4. checks the new config with Nix
 #   5. offers to save it to GitHub (git commit + git push)
 #
@@ -151,10 +151,10 @@ PATH="${TOOLS_DIR:+$TOOLS_DIR:}$PATH" bash "$REPO/scripts/new-host.sh" "$NAME" -
 if (( ${#NIX[@]} )); then
   echo
   echo "Checking the new config with Nix ..."
-  if "${NIX[@]}" eval --raw "path:$REPO#nixosConfigurations.$NAME.config.system.build.toplevel.drvPath" >/dev/null 2>&1; then
+  if "${NIX[@]}" eval --no-write-lock-file --raw "path:$REPO#nixosConfigurations.$NAME.config.system.build.toplevel.drvPath" >/dev/null 2>&1; then
     echo "OK: the config is valid."
   else
-    echo "Warning: Nix could not evaluate the new config. Details: nix eval path:$REPO#nixosConfigurations.$NAME.config.system.build.toplevel.drvPath"
+    echo "Warning: Nix could not evaluate the new config. Details: nix eval --no-write-lock-file path:$REPO#nixosConfigurations.$NAME.config.system.build.toplevel.drvPath"
   fi
 fi
 

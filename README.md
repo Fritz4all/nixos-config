@@ -65,6 +65,7 @@ Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 | `modules/commands.nix` | the daily commands `rebuild`, `rebuild-boot`, `nixup`, `versions`, `nixos-release` |
 | `modules/auto-update.nix` | the weekly automatic update (active at the next start) |
 | `modules/logitech.nix` | Solaar for Logitech mice, with the button rules in `modules/logitech/rules.yaml` |
+| `modules/graphics.nix` | video cards: video acceleration for Intel, the NVIDIA driver, and PRIME offload on laptops with two GPUs |
 | `modules/desktop/` | `gnome.nix` and `plasma.nix`, each in a Full and a Minimal version; chosen per config |
 | `modules/disk.nix` | finds the disks by name (not by disk ID), so one config works on every machine of a type |
 | `hosts/<config>/` | **one config per machine type and variant**, e.g. `lenovo-thinkpad-t14-gen-3-gnome`: hardware of that type, vendor/model (`machine.nix`), desktop, apps, disk encryption. Shared by every machine of that type; made by the installer |
@@ -143,6 +144,11 @@ Solaar starts hidden at login and gets button rules in `~/.config/solaar/rules.y
 the volume**. The rules come from `modules/logitech/rules.yaml` and are only copied when the file does not exist
 yet, so changes you make in Solaar's rule editor are kept. A mouse connected only through Bluetooth is not seen
 during installation; add `my.logitech.enable = true;` yourself and run `rebuild`. Log out and in once afterwards.
+
+**Video cards:** when a config is made, the video cards are detected. Intel gets hardware video acceleration
+(`my.intelGpu = true;`), AMD works out of the box, and NVIDIA gets its own driver (`my.nvidia.enable = true;`).
+On a laptop with two GPUs (e.g. Intel + NVIDIA) everything runs on the economical built-in GPU and the NVIDIA card
+is switched off when idle; start a program on the NVIDIA card with `nvidia-offload <program>`.
 
 **Unfree software** (e.g. Google Chrome, Spotify, Steam) is refused unless it is listed in `my.allowedUnfree`, so
 nothing unfree gets in unnoticed. To add one, put its name in that list in `modules/apps.nix` (all machines) or
