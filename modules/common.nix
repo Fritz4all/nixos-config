@@ -95,12 +95,21 @@
     services.fwupd.enable = true;   # firmware updates (command: fwupdmgr update)
     services.fstrim.enable = true;  # maintenance for SSDs
     zramSwap.enable = true;         # compressed swap in memory
+    # When memory runs out, stop the program that uses the most instead of letting the whole system freeze
+    systemd.oomd.enableUserSlices = true;
 
     ##### Printing and finding printers on the network #####
     services.printing.enable = true;
     # cups-browsed (automatic adding of network printers) is off: it had serious remote security holes in 2024
     # and is not needed; the print dialogs of GNOME and KDE find network printers by themselves.
     services.printing.browsed.enable = false;
+    # Scanners: network scanners and most USB all-in-one printers without extra drivers (AirScan / eSCL),
+    # plus the classic SANE drivers. Scan with Document Scanner (GNOME) or Skanpage (KDE Plasma).
+    hardware.sane = {
+      enable = true;
+      extraBackends = [ pkgs.sane-airscan ];
+    };
+    services.ipp-usb.enable = true;  # driverless printing and scanning over USB
     services.avahi = {
       enable = true;
       nssmdns4 = true;
@@ -112,7 +121,7 @@
     users.users.${vars.username} = {
       isNormalUser = true;
       description = vars.fullName;
-      extraGroups = [ "wheel" "networkmanager" ];
+      extraGroups = [ "wheel" "networkmanager" "scanner" "lp" ];
     };
 
     ##### Basic programs #####

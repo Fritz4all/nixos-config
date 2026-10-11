@@ -9,6 +9,8 @@
 let
   cfg = config.my.nvidia;
   hybrid = cfg.prime.nvidiaBusId != "" && (cfg.prime.intelBusId != "" || cfg.prime.amdgpuBusId != "");
+  weak = lib.mkOverride 1100;  # weaker than lib.mkDefault (1000), stronger than the option defaults (1500)
+  weakAll = lib.mapAttrsRecursiveCond (as: !lib.isDerivation as) (_: weak);
 in
 {
   options.my.intelGpu = lib.mkEnableOption "hardware video acceleration for an Intel GPU (Broadwell or newer)";
@@ -40,23 +42,30 @@ in
 
     (lib.mkIf cfg.enable {
       services.xserver.videoDrivers = [ "nvidia" ];
-      hardware.nvidia = {
-        modesetting.enable = true;
-        open = cfg.open;
-        nvidiaSettings = true;
-        package = config.boot.kernelPackages.nvidiaPackages.stable;
-        powerManagement.enable = true;                  # suspend and resume
-        powerManagement.finegrained = hybrid && cfg.open; # switch the NVIDIA card off when idle (Turing and newer)
-        prime = lib.mkIf hybrid {
-          offload.enable = true;
-          offload.enableOffloadCmd = true;              # the command nvidia-offload
-          intelBusId = cfg.prime.intelBusId;
-          amdgpuBusId = cfg.prime.amdgpuBusId;
-          nvidiaBusId = cfg.prime.nvidiaBusId;
-        };
-      };
+      # All with a low priority: a nixos-hardware profile for the model (see new-host.sh) knows better and wins,
+      # also over its own lib.mkDefault values
+      hardware.nvidia = lib.mkMerge [
+        (weakAll {
+          modesetting.enable = true;
+          open = cfg.open;
+          nvidiaSettings = true;
+          package = config.boot.kernelPackages.nvidiaPackages.stable;
+          powerManagement.enable = true;                  # suspend and resume
+          powerManagement.finegrained = hybrid && cfg.open; # switch the NVIDIA card off when idle (Turing and newer)
+        })
+        (lib.mkIf hybrid {
+          prime = weakAll {
+            offload.enableOffloadCmd = true;              # the command nvidia-offload
+            intelBusId = cfg.prime.intelBusId;
+            amdgpuBusId = cfg.prime.amdgpuBusId;
+            nvidiaBusId = cfg.prime.nvidiaBusId;
+          };
+        })
+        # NixOS itself sets this one with lib.mkDefault, so just above that
+        (lib.mkIf hybrid { prime.offload.enable = lib.mkOverride 999 true; })
+      ];
       # The NVIDIA driver is unfree software
-      my.allowedUnfree = [ "nvidia-x11" "nvidia-settings" "nvidia-persistenced" ];
+      my.allowedUnfree = [ "nvidia-x11" "nvidia-settings" "nvidia-persistenced" "nvidia-kernel-modules" ];
     })
   ];
 }

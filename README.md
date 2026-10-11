@@ -66,6 +66,7 @@ Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 | `modules/auto-update.nix` | the weekly automatic update (active at the next start) |
 | `modules/logitech.nix` | Solaar for Logitech mice, with the button rules in `modules/logitech/rules.yaml` |
 | `modules/graphics.nix` | video cards: video acceleration for Intel, the NVIDIA driver, and PRIME offload on laptops with two GPUs |
+| `modules/hardware.nix` | the fingerprint reader (with Dell's own driver where needed) |
 | `modules/desktop/` | `gnome.nix` and `plasma.nix`, each in a Full and a Minimal version; chosen per config |
 | `modules/disk.nix` | finds the disks by name (not by disk ID), so one config works on every machine of a type |
 | `hosts/<config>/` | **one config per machine type and variant**, e.g. `lenovo-thinkpad-t14-gen-3-gnome`: hardware of that type, vendor/model (`machine.nix`), desktop, apps, disk encryption. Shared by every machine of that type; made by the installer |
@@ -149,6 +150,23 @@ during installation; add `my.logitech.enable = true;` yourself and run `rebuild`
 (`my.intelGpu = true;`), AMD works out of the box, and NVIDIA gets its own driver (`my.nvidia.enable = true;`).
 On a laptop with two GPUs (e.g. Intel + NVIDIA) everything runs on the economical built-in GPU and the NVIDIA card
 is switched off when idle; start a program on the NVIDIA card with `nvidia-offload <program>`.
+
+**Other hardware** that is detected when a config is made and then turned on for that config:
+
+| Hardware | What you get |
+|---|---|
+| Fingerprint reader | log in, unlock and `sudo` with a finger. Add your finger once in Settings → Users (KDE: Users → Configure Fingerprint Authentication) or with `fprintd-enroll`. The first login after a start still asks for the password, so your keyring is unlocked |
+| Smartcard reader | the smartcard service (`pcscd`), e.g. for an eID or company card |
+| Thunderbolt / USB4 | approve docks and Thunderbolt devices in Settings |
+| Laptop with an Intel processor | `thermald`: keeps it cool without slowing it down more than needed |
+| Rotation / light sensors (2-in-1 laptops, tablets) | the screen rotates with the device; automatic brightness |
+| A model known to [nixos-hardware](https://github.com/NixOS/nixos-hardware) | the community fixes for that model (needs internet when the config is made) |
+
+**On every machine:** scanners work (network scanners and most all-in-one printers, without extra drivers; scan
+with Document Scanner in GNOME or Skanpage in KDE Plasma), there is a backup app for your home folder (Backups /
+Déjà Dup in GNOME, Kup in KDE Plasma: set it up once with a USB disk, network share or cloud and it backs up
+automatically), and when memory runs out the program using the most is stopped instead of the whole system
+freezing.
 
 **Unfree software** (e.g. Google Chrome, Spotify, Steam) is refused unless it is listed in `my.allowedUnfree`, so
 nothing unfree gets in unnoticed. To add one, put its name in that list in `modules/apps.nix` (all machines) or

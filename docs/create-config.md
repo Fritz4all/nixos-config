@@ -75,6 +75,11 @@ It runs as your normal user; root is not needed.
    with a **Logitech receiver or mouse** attached Solaar with the button rules, and the **video cards** (the standard
    NixOS hardware detection leaves them out): Intel → video acceleration, NVIDIA → the NVIDIA driver, and on a
    laptop with two GPUs PRIME offload (start a program on the NVIDIA card with `nvidia-offload <program>`).
+   Also: a **fingerprint reader** (only readers that work on NixOS, listed in `scripts/fingerprint-ids.txt`; Dell's
+   ControlVault readers get Dell's driver), a **smartcard reader**, **Thunderbolt**, **thermald** on laptops with an
+   Intel processor, **rotation/light sensors**, and the **[nixos-hardware](https://github.com/NixOS/nixos-hardware)
+   profile** of the model when there is one (this needs internet; without it the script says so and continues).
+   Each found item is added as a short block with a comment to `default.nix`, so you can see and change it.
    No machine name or serial number is stored.
 
 4. **Checks the config with Nix**: "OK: the config is valid."
@@ -110,6 +115,26 @@ bash create-config.sh --desktop plasma --apps full --encrypted yes --name lenovo
   with this config get the change at their next `git pull && rebuild`.
 - **Remove a config you made by mistake** (before pushing): delete its folder `hosts/<config>/` and run
   `bash scripts/hosts-overview.sh` to update `hosts/README.md`.
+
+## Adding a nixos-hardware profile by hand
+
+The script looks for a profile with the same name as the machine type (with `intel`/`amd` and `nvidia` where
+they apply). Model names do not always match, so check the list at <https://github.com/NixOS/nixos-hardware>
+(the table in its README). When you find your model, e.g. `dell-latitude-7490`, put it in the `imports` of
+`hosts/<config>/default.nix`, and make sure `nixos-hardware` is in the first line:
+
+```nix
+{ config, lib, pkgs, nixos-hardware, ... }:
+{
+  imports = [
+    ./hardware-configuration.nix
+    ./machine.nix
+    nixos-hardware.nixosModules.dell-latitude-7490
+  ];
+```
+
+The profile wins over the video card settings that the script detected. Check it with
+`nix eval --no-write-lock-file path:.#nixosConfigurations.<config>.config.system.build.toplevel.drvPath`.
 
 ## When something goes wrong
 

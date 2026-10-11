@@ -22,5 +22,10 @@ in
       discover                    # app store
       plasma-browser-integration  # browser add-on helper
     ]);
+
+    environment.systemPackages = with pkgs.kdePackages; [
+      kup       # Backups: automatic backups of your home folder (System Settings → Backups)
+      skanpage  # scanning documents
+    ];
   };
 }

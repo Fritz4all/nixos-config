@@ -8,6 +8,7 @@
     ./auto-update.nix
     ./logitech.nix
     ./graphics.nix
+    ./hardware.nix
     ./desktop
   ];
 }

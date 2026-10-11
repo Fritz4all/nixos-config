@@ -8,6 +8,9 @@
 # With a Logitech receiver or mouse attached it turns on Solaar with the button rules (my.logitech.enable).
 # Video cards (nixos-generate-config does not look at them): Intel → video acceleration (my.intelGpu); NVIDIA → the
 # NVIDIA driver (my.nvidia), with PRIME offload when there is also an Intel or AMD GPU (hybrid laptops).
+# Also: fingerprint reader (my.fingerprint, ids in scripts/fingerprint-ids.txt), smartcard reader (pcscd), Thunderbolt
+# (bolt), Intel laptops (thermald), sensors for rotation/brightness (iio), and the nixos-hardware profile of the model.
+# For tests the hardware can be faked: DMI_DIR, USB_SYSFS, PCI_SYSFS, TB_SYSFS, IIO_SYSFS, CPUINFO, NIXOS_HARDWARE_LIST.
 # Afterwards it updates the overview in hosts/README.md.
 #
 # Usage: bash scripts/new-host.sh <variant> [options]
@@ -171,6 +174,94 @@ if [[ -n "$NVIDIA_GPU" ]]; then
   fi
   add_to_host "NVIDIA GPU found ($(gpu_name "$NVIDIA_GPU")): $note, added by new-host.sh." "$block"
   echo "NVIDIA GPU detected ($(gpu_name "$NVIDIA_GPU")): $note."
+fi
+
+# Fingerprint reader: USB ids of readers that work on NixOS are in scripts/fingerprint-ids.txt (with their driver)
+FP=""; FP_DRIVER=""
+for d in "${USB_SYSFS:-/sys/bus/usb/devices}"/*; do
+  [[ -f "$d/idVendor" && -f "$d/idProduct" ]] || continue
+  id="$(cat "$d/idVendor"):$(cat "$d/idProduct")"
+  drv="$(awk -v id="$id" '$1 == id { print $2; exit }' "$REPO/scripts/fingerprint-ids.txt")"
+  if [[ -n "$drv" ]]; then FP="$id $(cat "$d/product" 2>/dev/null || true)"; FP_DRIVER="$drv"; break; fi
+done
+if [[ -n "$FP" ]]; then
+  block="  my.fingerprint.enable = true;"
+  [[ "$FP_DRIVER" != libfprint ]] && block+="
+  my.fingerprint.driver = \"$FP_DRIVER\";  # Dell's own driver for this reader"
+  add_to_host "Fingerprint reader found ($FP): log in with a finger (add it with fprintd-enroll), added by new-host.sh." "$block"
+  echo "Fingerprint reader detected ($FP): fingerprint login is turned on (driver: $FP_DRIVER)."
+fi
+
+# Smartcard reader (USB interface class 0b), e.g. for an eID or company card
+SC=""
+for d in "${USB_SYSFS:-/sys/bus/usb/devices}"/*:*; do
+  [[ "$(cat "$d/bInterfaceClass" 2>/dev/null)" == 0b ]] && { SC="$(cat "${d%:*}/product" 2>/dev/null || basename "${d%:*}")"; break; }
+done
+if [[ -n "$SC" ]]; then
+  add_to_host "Smartcard reader found ($SC), added by new-host.sh." \
+"  services.pcscd.enable = true;"
+  echo "Smartcard reader detected ($SC): the smartcard service is turned on."
+fi
+
+# Thunderbolt / USB4: bolt lets you approve docks and other Thunderbolt devices (in Settings)
+if compgen -G "${TB_SYSFS:-/sys/bus/thunderbolt/devices}/domain*" >/dev/null; then
+  add_to_host "Thunderbolt found: approve docks and devices in Settings, added by new-host.sh." \
+"  services.hardware.bolt.enable = true;"
+  echo "Thunderbolt detected: Thunderbolt device management (bolt) is turned on."
+fi
+
+# Laptop with an Intel processor: thermald keeps it cool without slowing it down more than needed
+CPU_VENDOR="$(awk -F': ' '/^vendor_id/ { print $2; exit }' "${CPUINFO:-/proc/cpuinfo}" 2>/dev/null || true)"
+if [[ "$CPU_VENDOR" == GenuineIntel && ( "$KIND" == Laptop || "$KIND" == Tablet ) ]]; then
+  add_to_host "Laptop with an Intel processor: temperature management, added by new-host.sh." \
+"  services.thermald.enable = true;"
+  echo "Intel laptop detected: temperature management (thermald) is turned on."
+fi
+
+# Sensors (screen rotation on 2-in-1 laptops and tablets, automatic screen brightness)
+CHASSIS="$(cat "${DMI_DIR:-/sys/class/dmi/id}/chassis_type" 2>/dev/null || true)"
+if compgen -G "${IIO_SYSFS:-/sys/bus/iio/devices}/iio:device*" >/dev/null || [[ "$CHASSIS" =~ ^(30|31|32)$ ]]; then
+  add_to_host "Sensors found (rotation / light), added by new-host.sh." \
+"  hardware.sensor.iio.enable = true;"
+  echo "Sensors detected: screen rotation and automatic brightness are turned on."
+fi
+
+# nixos-hardware: community fixes for this model, when there is a profile for it (needs Nix and internet;
+# the list of profiles can also be given in a file, NIXOS_HARDWARE_LIST)
+hw_profiles() {
+  if [[ -n "${NIXOS_HARDWARE_LIST:-}" ]]; then cat "$NIXOS_HARDWARE_LIST" 2>/dev/null; return 0; fi
+  local nix=""
+  if command -v nix >/dev/null 2>&1; then nix=nix
+  elif [[ -x "${NIX_DEFAULT_BIN:-/nix/var/nix/profiles/default/bin/nix}" ]]; then nix="${NIX_DEFAULT_BIN:-/nix/var/nix/profiles/default/bin/nix}"; fi
+  [[ -n "$nix" ]] || return 0
+  timeout 120 "$nix" --extra-experimental-features 'nix-command flakes' eval --json \
+    github:NixOS/nixos-hardware#nixosModules --apply builtins.attrNames 2>/dev/null | tr -d '[]"' | tr ',' '\n'
+  return 0
+}
+if [[ "$VIRT" == "" || "$VIRT" == none ]]; then
+  PROFILES="$(hw_profiles)"
+  if [[ -z "$PROFILES" ]]; then
+    echo "Note: the list of nixos-hardware profiles could not be fetched (no internet or no Nix); see docs/create-config.md."
+  else
+    # e.g. lenovo-thinkpad-t14-gen-3 → lenovo-thinkpad-t14-intel-gen3-nvidia, lenovo-thinkpad-t14-intel-gen3, lenovo-thinkpad-t14-gen3
+    t="$(machine_type | sed -E 's/-gen-([0-9]+)$/-gen\1/')"
+    cpu=""; [[ "$CPU_VENDOR" == GenuineIntel ]] && cpu=intel; [[ "$CPU_VENDOR" == AuthenticAMD ]] && cpu=amd
+    with_cpu="$t"
+    if [[ -n "$cpu" ]]; then
+      if [[ "$t" =~ -gen[0-9]+$ ]]; then with_cpu="$(sed -E "s/-(gen[0-9]+)$/-$cpu-\1/" <<<"$t")"; else with_cpu="$t-$cpu"; fi
+    fi
+    candidates=()
+    [[ -n "$NVIDIA_GPU" ]] && candidates+=("$with_cpu-nvidia" "$t-nvidia")
+    candidates+=("$with_cpu" "$t")
+    HW=""
+    for c in "${candidates[@]}"; do grep -qx "$c" <<<"$PROFILES" && { HW="$c"; break; }; done
+    if [[ -n "$HW" ]]; then
+      sed -i "/\.\/machine\.nix/a\\    nixos-hardware.nixosModules.$HW  # fixes for this model (github.com/NixOS/nixos-hardware), added by new-host.sh" "$DEST/default.nix"
+      echo "nixos-hardware has a profile for this model: $HW (added to the config)."
+    else
+      echo "nixos-hardware has no profile for $t (that is fine; see docs/create-config.md to add one by hand)."
+    fi
+  fi
 fi
 
 trap - ERR

@@ -22,7 +22,7 @@ in
   environment.etc."nixos-config-iso".text = lib.concatMapStrings (v: v + "\n") variants;
 
   # Everything needed to install those configs without internet
-  isoImage.storeContents = systems ++ [ self.inputs.nixpkgs.outPath ];
+  isoImage.storeContents = systems ++ lib.mapAttrsToList (_: input: input.outPath) self.inputs;
 
   # Tools used by the installation menu
   environment.systemPackages = with pkgs; [ git gnome-console ];

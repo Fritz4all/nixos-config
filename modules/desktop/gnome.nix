@@ -21,7 +21,9 @@ in
 
     environment.systemPackages = with pkgs; [
       gnome-tweaks
+      deja-dup             # Backups: automatic backups of your home folder (to a USB disk, network or cloud)
     ] ++ lib.optionals minimal [
+      simple-scan          # Document Scanner
       nautilus             # Files
       gnome-console        # Terminal
       gnome-text-editor    # Text Editor

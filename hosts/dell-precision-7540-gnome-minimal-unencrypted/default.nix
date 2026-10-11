@@ -35,4 +35,17 @@
   my.nvidia.open = true;  # true: Turing or newer; false: an older card
   my.nvidia.prime.intelBusId = "PCI:0:2:0";
   my.nvidia.prime.nvidiaBusId = "PCI:1:0:0";
+
+  # Fingerprint reader found (0a5c:5842 58200): log in with a finger (add it with fprintd-enroll), added by new-host.sh.
+  my.fingerprint.enable = true;
+  my.fingerprint.driver = "broadcom";  # Dell's own driver for this reader
+
+  # Smartcard reader found (58200), added by new-host.sh.
+  services.pcscd.enable = true;
+
+  # Thunderbolt found: approve docks and devices in Settings, added by new-host.sh.
+  services.hardware.bolt.enable = true;
+
+  # Laptop with an Intel processor: temperature management, added by new-host.sh.
+  services.thermald.enable = true;
 }

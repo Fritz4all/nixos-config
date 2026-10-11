@@ -1,7 +1,7 @@
 # Config for ONE machine type and variant (e.g. a Lenovo ThinkPad T14 Gen 3 with GNOME), shared by every
 # machine of that type that is installed with it. Shared settings live in ../../modules and ../../vars.nix.
 # scripts/new-host.sh copies this file to hosts/<variant>/default.nix and fills in the @...@ values.
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, nixos-hardware, ... }:
 
 {
   imports = [

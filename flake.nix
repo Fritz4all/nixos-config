@@ -6,7 +6,12 @@
   # that script edits this line, so keep its format.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
-  outputs = { self, nixpkgs }:
+  # Community fixes for specific laptop and PC models; scripts/new-host.sh links a config to its model
+  # when there is one (https://github.com/NixOS/nixos-hardware).
+  inputs.nixos-hardware.url = "github:NixOS/nixos-hardware";
+  inputs.nixos-hardware.inputs.nixpkgs.follows = "nixpkgs";  # no second copy of nixpkgs
+
+  outputs = { self, nixpkgs, nixos-hardware }:
     let
       inherit (nixpkgs) lib;
       vars = import ./vars.nix;
@@ -21,7 +26,7 @@
       );
 
       mkVariant = variant: lib.nixosSystem {
-        specialArgs = { inherit vars; };
+        specialArgs = { inherit vars nixos-hardware; };
         modules = [
           ./modules
           ./hosts/${variant}
