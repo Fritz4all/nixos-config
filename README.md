@@ -12,7 +12,7 @@ Installing a machine comes down to: boot the NixOS installer, get this folder, r
 ## Contents
 
 - [What is in this folder](#what-is-in-this-folder)
-- [Keeping secrets out](#keeping-secrets-out)
+- [Daily use](#daily-use)
 - [Part 1: Put the config on a USB stick](#part-1-put-the-config-on-a-usb-stick)
 - [Part 2: Install a machine](#part-2-install-a-machine)
   - [2.1 Make the installer USB stick and start from it](#21-make-the-installer-usb-stick-and-start-from-it)
@@ -22,7 +22,7 @@ Installing a machine comes down to: boot the NixOS installer, get this folder, r
   - [2.5 Optional: save the new machine to GitHub](#25-optional-save-the-new-machine-to-github)
 - [Adding another machine](#adding-another-machine)
 - [Desktop: GNOME or KDE Plasma, Full or Minimal](#desktop-gnome-or-kde-plasma-full-or-minimal)
-- [Daily use](#daily-use)
+- [Keeping secrets out](#keeping-secrets-out)
 - [New NixOS releases](#new-nixos-releases)
 - [Troubleshooting](#troubleshooting)
 - [Details](#details)
@@ -74,27 +74,38 @@ Shared = everything in `vars.nix` and `modules/`. Different per machine = only i
 
 ---
 
-## Keeping secrets out
+## Daily use
 
-This repo is **public**: everyone can read it, and anything that was ever committed stays in the history, even
-after you delete it. So passwords, keys and tokens never go in here. Passwords belong in Bitwarden; your user
-password is set during installation and is not stored in the repo. Three safeguards help:
+| Command | What it does |
+|---|---|
+| `rebuild` | apply changes in `/etc/nixos` right away |
+| `rebuild-boot` | apply at the next reboot (safe for big changes) |
+| `nixup` | update all packages (`nix flake update`) and apply |
+| `versions` | show the versions of NixOS, kernel, desktop and your programs |
+| `nixos-release` | show or change the NixOS release (see "New NixOS releases") |
+| `sudo nixos-rebuild switch --rollback` | go back to the previous version |
+| `nixos-rebuild list-generations` | list all versions (generations) of the system, with their date; the current one is marked |
+| `nix-shell -p gimp` | use a program temporarily (here GIMP) in this terminal; gone after `exit` or closing the terminal, nothing is installed |
+| `nix-collect-garbage` | remove downloads that nothing uses any more (e.g. from `nix-shell`); your system and its generations stay |
 
-1. **`.gitignore`** keeps typical secret files out of Git (`.env`, `secrets/`, `*.key`, `*.pem`, `id_ed25519`,
-   files with "password" in the name, …).
-2. **`.githooks/pre-commit`** checks every commit and **blocks** it when something looks like a password
-   (`password = "…"`), a password hash, a private key or a token. It is turned on automatically on new machines
-   (by step 3 of the menu). On a computer where you cloned the repo yourself, turn it on once with:
-   ```bash
-   git config core.hooksPath .githooks
-   ```
-   Check the whole repo at any time with `bash .githooks/pre-commit --all`.
-3. **GitHub push protection** is turned on for the repo: GitHub itself refuses a push that contains a
-   recognisable token or key.
+These are real commands (in `modules/commands/`): they work with and without `sudo` and ask for your password
+when needed. They build as the owner of `/etc/nixos` and only use administrator rights to activate.
 
-Is something blocked that is really not a secret? Add the comment `allow-secret` on that line.
-Need a real secret in the config one day (e.g. a Wi-Fi password)? Ask for a secrets tool such as sops-nix or
-agenix: those store secrets encrypted, so only your machines can read them.
+Something broken after an update? Choose an older version in the boot menu.
+
+**Adding software:** look up the package at <https://search.nixos.org/packages> and add its name to
+`modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<name>/default.nix` (one machine).
+Then `rebuild`, `git commit` and `git push`.
+
+**Unfree software** (e.g. Google Chrome, Spotify, Steam) is refused unless it is listed in `my.allowedUnfree`, so
+nothing unfree gets in unnoticed. To add one, put its name in that list in `modules/apps.nix` (all machines) or
+add `my.allowedUnfree = [ "spotify" ];` to `hosts/<name>/default.nix` (one machine). Firmware and CPU microcode
+are always allowed.
+
+**Trying software temporarily** (nothing is installed, no new generation): `nix run nixpkgs#gimp` starts it once,
+`nix shell nixpkgs#gimp` makes it available in that terminal until you close it. For unfree software:
+`NIXPKGS_ALLOW_UNFREE=1 nix shell --impure nixpkgs#spotify`. The downloads are removed by the weekly cleanup
+(or right away with `nix-collect-garbage`).
 
 ---
 
@@ -293,38 +304,27 @@ Your own apps (Firefox, Chrome, …) stay the same. The settings of each desktop
 
 ---
 
-## Daily use
+## Keeping secrets out
 
-| Command | What it does |
-|---|---|
-| `rebuild` | apply changes in `/etc/nixos` right away |
-| `rebuild-boot` | apply at the next reboot (safe for big changes) |
-| `nixup` | update all packages (`nix flake update`) and apply |
-| `versions` | show the versions of NixOS, kernel, desktop and your programs |
-| `nixos-release` | show or change the NixOS release (see "New NixOS releases") |
-| `sudo nixos-rebuild switch --rollback` | go back to the previous version |
-| `nixos-rebuild list-generations` | list all versions (generations) of the system, with their date; the current one is marked |
-| `nix-shell -p gimp` | use a program temporarily (here GIMP) in this terminal; gone after `exit` or closing the terminal, nothing is installed |
-| `nix-collect-garbage` | remove downloads that nothing uses any more (e.g. from `nix-shell`); your system and its generations stay |
+This repo is **public**: everyone can read it, and anything that was ever committed stays in the history, even
+after you delete it. So passwords, keys and tokens never go in here. Passwords belong in Bitwarden; your user
+password is set during installation and is not stored in the repo. Three safeguards help:
 
-These are real commands (in `modules/commands/`): they work with and without `sudo` and ask for your password
-when needed. They build as the owner of `/etc/nixos` and only use administrator rights to activate.
+1. **`.gitignore`** keeps typical secret files out of Git (`.env`, `secrets/`, `*.key`, `*.pem`, `id_ed25519`,
+   files with "password" in the name, …).
+2. **`.githooks/pre-commit`** checks every commit and **blocks** it when something looks like a password
+   (`password = "…"`), a password hash, a private key or a token. It is turned on automatically on new machines
+   (by step 3 of the menu). On a computer where you cloned the repo yourself, turn it on once with:
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+   Check the whole repo at any time with `bash .githooks/pre-commit --all`.
+3. **GitHub push protection** is turned on for the repo: GitHub itself refuses a push that contains a
+   recognisable token or key.
 
-Something broken after an update? Choose an older version in the boot menu.
-
-**Adding software:** look up the package at <https://search.nixos.org/packages> and add its name to
-`modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<name>/default.nix` (one machine).
-Then `rebuild`, `git commit` and `git push`.
-
-**Unfree software** (e.g. Google Chrome, Spotify, Steam) is refused unless it is listed in `my.allowedUnfree`, so
-nothing unfree gets in unnoticed. To add one, put its name in that list in `modules/apps.nix` (all machines) or
-add `my.allowedUnfree = [ "spotify" ];` to `hosts/<name>/default.nix` (one machine). Firmware and CPU microcode
-are always allowed.
-
-**Trying software temporarily** (nothing is installed, no new generation): `nix run nixpkgs#gimp` starts it once,
-`nix shell nixpkgs#gimp` makes it available in that terminal until you close it. For unfree software:
-`NIXPKGS_ALLOW_UNFREE=1 nix shell --impure nixpkgs#spotify`. The downloads are removed by the weekly cleanup
-(or right away with `nix-collect-garbage`).
+Is something blocked that is really not a secret? Add the comment `allow-secret` on that line.
+Need a real secret in the config one day (e.g. a Wi-Fi password)? Ask for a secrets tool such as sops-nix or
+agenix: those store secrets encrypted, so only your machines can read them.
 
 ---
 
