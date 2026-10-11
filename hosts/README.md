@@ -6,5 +6,4 @@ This file is updated by `scripts/new-host.sh`.
 
 | Config | Vendor | Model | Kind | Desktop | Apps | Encrypted |
 |---|---|---|---|---|---|---|
-| `dell-precision-7540-gnome-minimal-unencrypted` | Dell | Precision 7540 | Laptop | GNOME | minimal | no |
-| `dell-precision-7540-gnome-minimal-unencrypted-2` | Dell | Precision 7540 | Laptop | GNOME | minimal | no |
+| `dell-precision-7540-plasma-minimal-unencrypted` | Dell | Precision 7540 | Laptop | KDE Plasma | minimal | no |
