@@ -1,0 +1,2 @@
+# GitHub (and git archive) fill in VERSION with the commit and its date when the repo is downloaded as ZIP/tarball
+VERSION export-subst

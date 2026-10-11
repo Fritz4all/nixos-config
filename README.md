@@ -21,6 +21,7 @@ Installing a machine comes down to: boot the NixOS installer, get this folder, r
   - [2.4 The installation menu](#24-the-installation-menu)
   - [2.5 Optional: save the new machine to GitHub](#25-optional-save-the-new-machine-to-github)
 - [Adding another machine](#adding-another-machine)
+- [Creating a config without installing](#creating-a-config-without-installing)
 - [Desktop: GNOME or KDE Plasma, Full or Minimal](#desktop-gnome-or-kde-plasma-full-or-minimal)
 - [Building your own ISO](#building-your-own-iso)
 - [Keeping secrets out](#keeping-secrets-out)
@@ -39,6 +40,8 @@ nixos-config/
 ├── README.md        this guide
 ├── install.sh       THE INSTALLER: start this in the NixOS live system
 ├── build-iso.sh     builds your own installer ISO (run it on your own computer, see "Building your own ISO")
+├── create-config.sh makes a config from the hardware of the machine it runs on (see "Creating a config without installing")
+├── VERSION          the version of this copy (filled in by GitHub when you download a ZIP)
 ├── flake.nix        ┐
 ├── flake.lock       │  THE CONFIGURATION AND THE INSTALLER
 ├── vars.nix         │  Needed on GitHub and on the USB stick.
@@ -79,6 +82,8 @@ Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 | `scripts/machine-info.sh` | reads vendor, model, kind and serial number from the firmware |
 | `scripts/hosts-overview.sh` | writes `hosts/README.md` and lists the configs for the installer and `build-iso.sh` |
 | `build-iso.sh` + `iso/installer.nix` | build your own installer ISO with the config (and optionally all software) on it |
+| `create-config.sh` | make a config for this machine's type from its hardware, without installing ([manual](docs/create-config.md)) |
+| `scripts/version-check.sh` + `VERSION` | compare this copy with GitHub; the installer offers the newer version |
 | `scripts/versions.sh` | show the versions of the system and your programs (later also as the command `versions`) |
 
 Shared = everything in `vars.nix` and `modules/`. Per machine **type** = its config in `hosts/`. Per **machine** =
@@ -241,6 +246,9 @@ The menu shows all steps. Steps that are done get a ✔, and ▶ points to the n
 
 - **Enter** runs the next step, **a** runs all remaining steps one after another, a **number** runs that step
   (for example to redo one).
+- **Version** (in the header) compares this copy with GitHub. Is the copy older (e.g. an old USB stick or ISO) and is
+  there internet, the menu asks at the start whether to use the newer version: it is downloaded to `/tmp` and the
+  menu starts again from there. Later you can do the same with **u**.
 - **i** (info) shows the versions of the installed system (NixOS, kernel, desktop, Firefox, Chrome, Brave,
   Bitwarden, VLC); before installing it shows what is going to be installed.
 - **d** (or `--dry-run`) is a dry run: everything is shown, nothing is changed. Handy to look around first.
@@ -265,6 +273,11 @@ Your Wi-Fi password is not copied from the live environment; enter it again afte
 If the installation fails halfway (e.g. a network error), choose step 5 again and choose **1 (Reuse)** for the
 name. If you repartitioned the disk, choose **2 (Recreate)**; the script stops by itself when the hardware
 configuration does not match the mounted disk.
+
+**Where a new config is stored:** when step 4 makes a new variant, step 5 creates it in `/mnt/etc/nixos/hosts/<config>/`
+on the new disk; after the first start that is **`/etc/nixos/hosts/<config>/`** on the installed machine. It is
+only on that machine until you save it to GitHub (2.5). (`create-config.sh` puts a new config in `hosts/` next to the
+script instead.)
 
 ### 2.5 Optional: save the new machine to GitHub
 **Not needed for the machine to work.** Your new NixOS runs fine without this step. When you made a **new config**
@@ -334,10 +347,26 @@ On the other machines: `cd /etc/nixos && git pull && rebuild`.
 
 ---
 
+## Creating a config without installing
+
+To add a machine type to GitHub without installing it (e.g. to build an ISO for many laptops of that type), run
+on one machine of that type:
+
+```bash
+bash create-config.sh
+```
+
+It shows the machine (vendor, model) and its existing configs, asks for the desktop, apps (Minimal by default),
+disk encryption and a name, detects the hardware, checks the config with Nix and offers to push it to GitHub.
+It works in the NixOS installer, on an installed NixOS and on another Linux with Nix (e.g. Ubuntu). Everything
+about it, including all options: [docs/create-config.md](docs/create-config.md).
+
+---
+
 ## Desktop: GNOME or KDE Plasma, Full or Minimal
 
 Firefox, Google Chrome, Brave, Bitwarden and VLC are always installed. On top of that, each desktop comes in
-two versions (chosen in step 4 of the menu):
+two versions (chosen in step 4 of the menu); **Minimal is the default**:
 
 | | Full (the desktop's usual set of apps) | Minimal (only what you need to work) |
 |---|---|---|
@@ -378,7 +407,7 @@ bash build-iso.sh
   Free space  390G (ISOs go to ~/ISOs)
 
      1  ISO with all configs (3)        every config, installable offline
-     2  ISO for one config               choose a machine type and variant
+     2  ISO for chosen configs           one or more configs, or a machine type
      3  Generic ISO                      installer + config, for new machine types
      4  Test an ISO in a VM              without network: is it really offline?
      5  Write an ISO to a USB stick
@@ -387,7 +416,7 @@ bash build-iso.sh
 | Choice | What it does |
 |---|---|
 | 1. All configs | one ISO with every config in `hosts/`; all of them install offline |
-| 2. One config | the configs are listed per machine type; choose one, or **a** = all variants of one type (e.g. GNOME and Plasma of the T14) |
+| 2. Chosen configs | the configs are listed per machine type; choose one or more (`2`, `1 3` or `1-3`), or **a** = all variants of one type (e.g. GNOME and Plasma of the T14) |
 | 3. Generic | only the installer and the config: small, for machine types that are not on GitHub yet (installing needs internet) |
 | 4. Test in a VM | starts an ISO in virt-manager **without network**, so you see whether the offline installation really works |
 | 5. USB stick | only USB sticks are offered (never your internal disk); you confirm by typing the stick's name |
@@ -403,8 +432,14 @@ Good to know:
   and takes 20 to 40 minutes the first time. ISOs go to `~/ISOs`, with a `.sha256` checksum next to them.
 - **Same versions:** the ISO contains the versions of the moment you built it (GitHub's `flake.lock` if there is
   one). After installing, the weekly automatic update brings them up to date. Rebuild the ISO now and then.
-- **Offline needs the same username** as in `vars.nix` on GitHub; with another username the installation
-  downloads the parts that differ.
+- **100% offline:** a config that is on the ISO installs without any internet when you use it **as it is**: the
+  username and full name from `vars.nix` (step 4 asks for confirmation if you type another one), the NixOS release
+  of the ISO, and the existing config (not a new variant). Before installing, step 5 checks with Nix, without
+  network, that everything is on the ISO ("Everything is on the ISO: the installation needs no internet") and then
+  installs with the ISO as the only source. If something is missing it says so, and it only continues when there
+  is internet. A new variant (a machine type that is not on the ISO) always needs internet. If the username in
+  `vars.nix` on GitHub is still `changeme`, `build-iso.sh` warns you: save your first installation to GitHub first.
+- **Your local repo** is compared with GitHub at the start; if it is behind, the script offers `git pull`.
 - **Google Chrome:** its license does not allow sharing it, so an ISO with Chrome is for **your own use** only.
   Do not put it on GitHub or a public website.
 

@@ -67,6 +67,15 @@ valid_full()    { [[ -n "$1" && "$1" != *\"* && "$1" != *\\* && "$1" != *\$* ]];
 valid_variant() { [[ "$1" =~ ^[a-z][a-z0-9-]{0,62}$ ]]; }
 valid_machine() { [[ "$1" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; }
 
+# On an ISO with offline software: the systems on it were built for the username and full name in its vars.nix.
+# Another value changes the system, and then the installation needs internet; ask before accepting that.
+offline_ok() {  # offline_ok <what> <value on the ISO> <new value>
+  [[ -s "$ISO_MARKER" && "$3" != "$2" ]] || return 0
+  echo "The software on this ISO was made for $1 '$2'. With '$3' the installation needs internet."
+  prompt "Use '$3' anyway? [y/N]: "
+  [[ "$REPLY" =~ ^[yYjJ] ]]
+}
+
 echo
 echo "Settings for this installation."
 echo
@@ -81,8 +90,8 @@ else
   while true; do
     if [[ -n "$CUR_USER" && "$CUR_USER" != changeme ]]; then prompt "Username [$CUR_USER]: "; USERNAME="${REPLY:-$CUR_USER}"
     else prompt "Username: "; USERNAME="$REPLY"; fi
-    valid_user "$USERNAME" && break
-    echo "Invalid. Use lowercase letters, digits, - and _, starting with a letter (not 'root')."
+    if ! valid_user "$USERNAME"; then echo "Invalid. Use lowercase letters, digits, - and _, starting with a letter (not 'root')."; continue; fi
+    offline_ok username "$CUR_USER" "$USERNAME" && break
   done
 fi
 
@@ -94,13 +103,9 @@ else
   while true; do
     prompt "Full name (for the login screen) [$DEFAULT_FULL]: "
     FULLNAME="${REPLY:-$DEFAULT_FULL}"
-    valid_full "$FULLNAME" && break
-    echo "Invalid. Do not use \" \\ or \$ in the name."
+    if ! valid_full "$FULLNAME"; then echo "Invalid. Do not use \" \\ or \$ in the name."; continue; fi
+    offline_ok "the full name" "$CUR_FULL" "$FULLNAME" && break
   done
-fi
-
-if [[ -s "$ISO_MARKER" && "$USERNAME" != "$CUR_USER" ]]; then
-  warn "The systems on this ISO were made for user '$CUR_USER'. With another username the installation needs internet."
 fi
 
 ##### 2. Config for this machine: type and variant #####
@@ -133,7 +138,7 @@ VARIANT=""; NEW_VARIANT=0; DESKTOP=""; APPS=""
 choose_desktop_apps() {
   local cur_d cur_a
   cur_d="$(current desktop)"; [[ "$cur_d" == gnome || "$cur_d" == plasma ]] || cur_d=gnome
-  cur_a="$(current desktopApps)"; [[ "$cur_a" == full || "$cur_a" == minimal ]] || cur_a=full
+  cur_a="$(current desktopApps)"; [[ "$cur_a" == full || "$cur_a" == minimal ]] || cur_a=minimal
   DESKTOP="$DESK_ARG"
   if [[ -n "$DESKTOP" ]]; then
     [[ "$DESKTOP" == gnome || "$DESKTOP" == plasma ]] || die "--desktop must be gnome or plasma."
@@ -247,6 +252,11 @@ else
       done
     else
       echo "There is no config for this machine type yet."
+    fi
+    if (( ${#MATCH[@]} )) && [[ -z "$default" ]]; then
+      echo "  None of these fits this disk: they were made for a disk that is $([[ "$DISK_ENC" == true ]] && echo "not encrypted" || echo encrypted)."
+      echo "  To use one of them, do step 2 again $([[ "$DISK_ENC" == true ]] && echo "without" || echo "with") encryption. Or make a new variant"
+      echo "  below$([[ -s "$ISO_MARKER" ]] && echo " (that needs internet: a new variant is not on this ISO)")."
     fi
     n_new=$(( ${#MATCH[@]} + 1 )); n_other=$(( ${#MATCH[@]} + 2 ))
     echo "  $n_new) New variant of this type        (you choose the desktop and its apps)"

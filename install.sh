@@ -46,6 +46,10 @@ if (( EUID != 0 && ! DRY_RUN )); then
   exec sudo bash "$0" "${ORIG_ARGS[@]}"
 fi
 
+# Version of this copy compared with GitHub (scripts/version-check.sh)
+# shellcheck source=scripts/version-check.sh
+source "$SELF_REPO/scripts/version-check.sh"
+
 # Vendor, model and kind of this computer (scripts/machine-info.sh)
 # shellcheck source=scripts/machine-info.sh
 source "$SELF_REPO/scripts/machine-info.sh"
@@ -187,6 +191,8 @@ repo_check() {
   esac
 }
 
+LOCAL_VERSION="$(local_version "$SELF_REPO")"
+ONLINE_VERSION=""
 ONLINE=0
 REPO_URL=""
 REPO_STATE=""   # text for the menu
@@ -195,6 +201,8 @@ refresh() {
   check_tools
   ONLINE=0; has_internet && ONLINE=1
   REPO_URL="$(repo_url)"
+  ONLINE_VERSION=""
+  (( ONLINE )) && [[ -n "$REPO_URL" ]] && ONLINE_VERSION="$(online_version "$REPO_URL")"
   if [[ -z "$REPO_URL" ]]; then
     REPO_STATE="${D}not set (repoUrl in vars.nix) – the config will be copied locally${N}"
   elif (( ! ONLINE )); then
@@ -266,6 +274,15 @@ draw() {
   if (( ${#MISSING_CMDS[@]} > 0 )); then
     printf '  %-11s %s\n' "Tools" "${Y}missing: ${MISSING_CMDS[*]}${N} ${D}(t = install)${N}"
   fi
+  if [[ -z "$LOCAL_VERSION" ]]; then
+    printf '  %-11s %s\n' "Version" "${D}unknown${N}"
+  elif is_newer "$ONLINE_VERSION" "$LOCAL_VERSION"; then
+    printf '  %-11s %s\n' "Version" "$(short_version "$LOCAL_VERSION") ${Y}GitHub has a newer one: $(short_version "$ONLINE_VERSION") (u = update)${N}"
+  elif [[ -n "$ONLINE_VERSION" ]]; then
+    printf '  %-11s %s\n' "Version" "$(short_version "$LOCAL_VERSION") ${G}(newest)${N}"
+  else
+    printf '  %-11s %s\n' "Version" "$(short_version "$LOCAL_VERSION") ${D}(GitHub not checked)${N}"
+  fi
   printf '  %-11s %s\n' "This PC" "$(machine_vendor) $(machine_model) ($(machine_kind))"
   if st_choice; then
     printf '  %-11s %s\n' "Config" "$(choice_of VARIANT) ${D}(machine name: $(choice_of MACHINE_NAME))${N}"
@@ -289,6 +306,36 @@ draw() {
   (( ${#MISSING_CMDS[@]} > 0 )) && echo "  ${B}t${N} = install missing tools"
   return 0
   echo
+}
+
+##### Newer version on GitHub #####
+
+# When GitHub has a newer version than this copy (e.g. an older USB stick or ISO), offer to use it. The newer
+# version is downloaded to /tmp (a USB stick or ISO is read-only) and the menu starts again from there.
+offer_update() {
+  local repo dir tmp="${NIXOS_CONFIG_TMP:-/tmp}" def=y
+  is_newer "$ONLINE_VERSION" "$LOCAL_VERSION" || return 0
+  [[ -n "${NIXOS_CONFIG_UPDATED:-}" ]] && return 0
+  echo
+  echo "${Y}A newer version of this config is on GitHub.${N}"
+  echo "  This copy:  $(short_version "$LOCAL_VERSION")"
+  echo "  GitHub:     $(short_version "$ONLINE_VERSION")"
+  if [[ -s "$ISO_MARKER" ]]; then
+    echo "Note: the software on this ISO fits its own version. With the newer version the installation may need"
+    echo "internet for the parts that changed."
+    def=n
+  fi
+  ask_yes "Use the newer version for this installation?" "$def" || { echo "Keeping this copy. Press u in the menu to change your mind."; pause; return 0; }
+  repo="$(gh_repo "$REPO_URL")"
+  dir="$tmp/nixos-config-${ONLINE_VERSION:0:7}"
+  if (( DRY_RUN )); then echo "+ curl -L https://github.com/$repo/archive/${ONLINE_VERSION%% *}.tar.gz | tar xz -C $tmp"; pause; return 0; fi
+  echo "Downloading the newer version to $dir ..."
+  rm -rf "$dir"; mkdir -p "$dir"
+  if ! curl -fsSL "https://github.com/$repo/archive/${ONLINE_VERSION%% *}.tar.gz" | tar -xz -C "$dir" --strip-components=1; then
+    echo "${R}Downloading failed.${N} Continuing with this copy."; pause; return 0
+  fi
+  echo "Starting the installer of the newer version ..."
+  NIXOS_CONFIG_UPDATED=1 exec bash "$dir/install.sh" "${ORIG_ARGS[@]}"
 }
 
 ##### Steps #####
@@ -469,6 +516,7 @@ run_all() {
 refresh
 offer_tools
 refresh
+offer_update
 while true; do
   draw
   prompt "Choice: "
@@ -490,6 +538,7 @@ while true; do
     i|I) show_info; pause ;;
     r|R) refresh ;;
     t|T) offer_tools; refresh ;;
+    u|U) refresh; if is_newer "$ONLINE_VERSION" "$LOCAL_VERSION"; then NIXOS_CONFIG_UPDATED="" offer_update; else echo "This copy is the newest version (or GitHub cannot be checked)."; pause; fi ;;
     q|Q)  echo "Stopped. Continue later? Run again: bash $SELF_REPO/install.sh"; exit 0 ;;
     *)    ;;
   esac

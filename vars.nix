@@ -11,11 +11,11 @@
   #   repoUrl = "https://github.com/YOURNAME/nixos-config.git";
   repoUrl = "https://github.com/Fritz4all/nixos-config.git";
 
-  # Default desktop for a NEW variant: "gnome" or "plasma" (KDE Plasma), and its apps: "full" (the desktop's
-  # usual set of apps) or "minimal" (only what you need to work). Each variant in hosts/<variant>/default.nix
+  # Default desktop for a NEW variant: "gnome" or "plasma" (KDE Plasma), and its apps: "minimal" (only what you
+  # need to work; the default) or "full" (the desktop's usual set of apps). Each variant in hosts/<variant>/default.nix
   # sets its own my.desktop and my.desktopApps; the installer asks for them when it creates a variant.
   desktop = "gnome";
-  desktopApps = "full";
+  desktopApps = "minimal";
 
   # Time, language and region
   timeZone = "Europe/Amsterdam";

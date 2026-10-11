@@ -28,7 +28,7 @@ for d in "$REPO"/hosts/*/; do
   [[ "$v" == _* ]] && continue
   m="$d/machine.nix"; c="$d/default.nix"
   desk="$(str_of my.desktop "$c")"; apps="$(str_of my.desktopApps "$c")"; enc="$(bool_of my.disk.encrypted "$c")"
-  lines+=("$v|$(str_of vendor "$m")|$(str_of model "$m")|$(str_of kind "$m")|${desk:-gnome}|${apps:-full}|${enc:-true}")
+  lines+=("$v|$(str_of vendor "$m")|$(str_of model "$m")|$(str_of kind "$m")|${desk:-gnome}|${apps:-minimal}|${enc:-true}")
 done
 
 if (( LIST )); then

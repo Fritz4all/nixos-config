@@ -109,6 +109,28 @@ else
   DESKTOP="$(str_of my.desktop "$HOST/default.nix")"; APPS="$(str_of my.desktopApps "$HOST/default.nix")"
 fi
 
+##### Offline from the ISO: is really everything there? #####
+
+# Evaluates the system that is going to be installed and asks Nix, without network, whether anything would have
+# to be built or downloaded. Only when nothing is missing, the installation runs without internet.
+if (( OFFLINE_ISO && ! DRY_RUN && ! CREATE )); then
+  echo
+  echo "Checking that everything for '$VARIANT' is on the ISO (without network) ..."
+  missing="$(nix --extra-experimental-features 'nix-command flakes' build --offline --dry-run --no-link \
+    "$CFG#nixosConfigurations.$VARIANT.config.system.build.toplevel" 2>&1 || true)"
+  if grep -qE 'will be (built|fetched)|error' <<<"$missing"; then
+    echo "${missing}" | grep -E 'will be|error' | head -n 5 | sed 's/^/  /'
+    warn "Not everything is on the ISO (another username or full name, another release, or a changed config?)."
+    OFFLINE_ISO=0
+    if ! curl -fsS --max-time 8 -o /dev/null https://cache.nixos.org/nix-cache-info >/dev/null 2>&1; then
+      die "The missing parts have to be downloaded, but there is no internet. Connect (step 1), or use the values the ISO was made for."
+    fi
+    echo "The missing parts are downloaded from the internet."
+  else
+    echo "Everything is on the ISO: the installation needs no internet."
+  fi
+fi
+
 ##### Update versions (optional) #####
 
 UPDATE=0
@@ -169,7 +191,10 @@ fi
 echo "After that you set two passwords: one for root (the administrator account) and one for $USERNAME."
 # --no-root-passwd: the root password is set below, where a typo only means trying again
 # (when nixos-install asks for it itself, a typo makes the whole installation fail).
-run nixos-install --no-root-passwd --flake "$CFG#$VARIANT"
+# Offline from the ISO: no download sources at all, only the ISO's own store (nixos-install adds it itself)
+OFFLINE_FLAGS=()
+(( OFFLINE_ISO )) && OFFLINE_FLAGS=(--substituters "")
+run nixos-install --no-root-passwd "${OFFLINE_FLAGS[@]}" --flake "$CFG#$VARIANT"
 
 trap - ERR
 

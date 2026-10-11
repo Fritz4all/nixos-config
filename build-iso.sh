@@ -3,7 +3,7 @@
 # Run it on your own computer (e.g. Ubuntu) as yourself, not in the NixOS installer.
 #
 #   1. ISO with all configs           every config in hosts/, all installable without internet
-#   2. ISO for one config             choose a machine type + variant (or all variants of one type)
+#   2. ISO for chosen configs         choose one or more configs (or all variants of one machine type)
 #   3. Generic ISO                    only the installer and the config, for new machine types (needs internet)
 #   4. Test an ISO in a VM            starts it in virt-manager WITHOUT network: is it really offline?
 #   5. Write an ISO to a USB stick    only USB sticks are offered; you confirm by typing the name
@@ -21,6 +21,7 @@
 set -euo pipefail
 
 SELF_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORIG_ARGS=("$@")
 DRY_RUN=0
 SOURCE=""
 OUT="${ISO_DIR:-$HOME/ISOs}"
@@ -126,6 +127,27 @@ sync_source() {
 configs() { bash "$SELF_REPO/scripts/hosts-overview.sh" --list --dir "$BUILD_SRC" 2>/dev/null || true; }
 release_of() { sed -n 's/.*inputs\.nixpkgs\.url.*nixos-\([^"]*\)".*/\1/p' "$BUILD_SRC/flake.nix" 2>/dev/null | head -n 1; }
 
+# Local repo behind GitHub? Then offer to update it (git pull) and restart this script, so you always use the
+# newest build-iso.sh. (The ISO itself is always built from GitHub.)
+offer_local_update() {
+  [[ -z "$SOURCE" && -z "${BUILD_ISO_UPDATED:-}" ]] || return 0
+  git -C "$SELF_REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  git -C "$SELF_REPO" fetch -q origin main 2>/dev/null || return 0
+  local behind
+  behind="$(git -C "$SELF_REPO" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)"
+  (( behind > 0 )) || return 0
+  echo
+  echo "${Y}Your local repo is $behind commit(s) behind GitHub.${N}"
+  ask_yes "Update it now (git pull)?" y || { echo "Not updated."; return 0; }
+  if (( DRY_RUN )); then echo "+ git -C $SELF_REPO pull --ff-only"; return 0; fi
+  if git -C "$SELF_REPO" pull -q --ff-only; then
+    echo "Updated. Starting the newest build-iso.sh ..."
+    BUILD_ISO_UPDATED=1 exec bash "$SELF_REPO/build-iso.sh" "${ORIG_ARGS[@]}"
+  else
+    echo "${R}Updating failed${N} (local changes that conflict?). Update by hand: cd $SELF_REPO && git pull"
+  fi
+}
+
 # Local repo: changes that are not on GitHub yet (they will not be on the ISO)
 local_state() {
   [[ -z "$SOURCE" ]] || { echo "building from $SOURCE"; return 0; }
@@ -161,6 +183,11 @@ build_iso() {  # build_iso <label> <variant...>
   echo "Building an ISO \"$label\" from GitHub (${SRC_REV:-?}), NixOS ${rel:-?}"
   if (( $# )); then echo "Configs on it (installable offline): $*"; else echo "Generic: only the installer and the config (installing needs internet)."; fi
   license_warning "$@"
+  if (( $# )) && grep -q 'username = "changeme"' "$BUILD_SRC/vars.nix" 2>/dev/null; then
+    echo "${Y}Note:${N} the username in vars.nix on GitHub is still 'changeme'. The software on the ISO is made for"
+    echo "      that name, so an offline installation only works with username 'changeme'. Save your first"
+    echo "      installation to GitHub first (README 2.5), or set username in vars.nix and push it."
+  fi
   expr="$(iso_expr "$label" "$@")"
 
   echo
@@ -188,11 +215,11 @@ build_iso() {  # build_iso <label> <variant...>
   echo "Next: test it in a VM (menu 4) or write it to a USB stick (menu 5)."
 }
 
-# Menu 2: list the configs grouped by machine type; choose one, or all variants of one type
+# Menu 2: list the configs grouped by machine type; choose one or more, or all variants of one type
 choose_config() {
   local -a lines; mapfile -t lines < <(configs)
   (( ${#lines[@]} )) || { echo "There are no configs on GitHub yet. Install a machine and save it to GitHub first (README 2.5)."; return 2; }
-  local -a types=() idx=() i t prev="" v ven mod kind desk apps enc
+  local -a types=() chosen=() i t prev="" v ven mod kind desk apps enc tok a b n
   echo
   for i in "${!lines[@]}"; do
     IFS='|' read -r v ven mod kind desk apps enc <<<"${lines[$i]}"
@@ -201,26 +228,36 @@ choose_config() {
     printf '    %d) %-46s %s\n' "$((i + 1))" "$v" "$(desk_name "$desk") ($apps)$([[ "$enc" == true ]] && echo ", encrypted")"
   done
   echo
-  echo "  a) all configs of one machine type (e.g. both variants in one ISO)"
-  prompt "Choose a number or a (Enter = back): "
+  echo "  One or more numbers, e.g. 2  or  1 3  or  1-3 (each config on the ISO installs offline)"
+  echo "  a = all configs of one machine type"
+  prompt "Choose (Enter = back): "
   [[ -n "$REPLY" ]] || return 2
   if [[ "$REPLY" == a || "$REPLY" == A ]]; then
     for i in "${!types[@]}"; do printf '  %d) %s\n' "$((i + 1))" "${types[$i]}"; done
     prompt "Which machine type? "
     [[ "$REPLY" =~ ^[0-9]+$ ]] && (( REPLY >= 1 && REPLY <= ${#types[@]} )) || { echo "Invalid choice."; return 2; }
     t="${types[$((REPLY - 1))]}"
-    local -a chosen=()
     for i in "${!lines[@]}"; do
       IFS='|' read -r v ven mod _ <<<"${lines[$i]}"
       [[ "$ven $mod" == "$t" ]] && chosen+=("$v")
     done
     build_iso "$(tr '[:upper:] ' '[:lower:]-' <<<"$t" | tr -cd 'a-z0-9-')" "${chosen[@]}"
-  elif [[ "$REPLY" =~ ^[0-9]+$ ]] && (( REPLY >= 1 && REPLY <= ${#lines[@]} )); then
-    v="$(cut -d'|' -f1 <<<"${lines[$((REPLY - 1))]}")"
-    build_iso "$v" "$v"
-  else
-    echo "Invalid choice."; return 2
+    return
   fi
+  # Numbers, separated by spaces or commas, and ranges like 1-3
+  for tok in ${REPLY//,/ }; do
+    if [[ "$tok" =~ ^([0-9]+)-([0-9]+)$ ]]; then a="${BASH_REMATCH[1]}"; b="${BASH_REMATCH[2]}"
+    elif [[ "$tok" =~ ^[0-9]+$ ]]; then a="$tok"; b="$tok"
+    else echo "Invalid choice: $tok"; return 2; fi
+    for (( n = a; n <= b; n++ )); do
+      (( n >= 1 && n <= ${#lines[@]} )) || { echo "There is no config $n."; return 2; }
+      v="$(cut -d'|' -f1 <<<"${lines[$((n - 1))]}")"
+      [[ " ${chosen[*]} " == *" $v "* ]] || chosen+=("$v")
+    done
+  done
+  (( ${#chosen[@]} )) || { echo "Nothing chosen."; return 2; }
+  if (( ${#chosen[@]} == 1 )); then build_iso "${chosen[0]}" "${chosen[0]}"
+  else build_iso "${#chosen[@]}-configs" "${chosen[@]}"; fi
 }
 
 build_generic() { build_iso generic; }
@@ -381,7 +418,7 @@ draw() {
   (( DRY_RUN )) && printf '  %-11s %s\n' "Mode" "${Y}DRY RUN${N} – nothing will be built or written"
   echo
   echo "     ${B}1${N}  ISO with all configs ($n)        every config, installable offline"
-  echo "     ${B}2${N}  ISO for one config               choose a machine type and variant"
+  echo "     ${B}2${N}  ISO for chosen configs           one or more configs, or a machine type"
   echo "     ${B}3${N}  Generic ISO                      installer + config, for new machine types"
   echo "     ${B}4${N}  Test an ISO in a VM              without network: is it really offline?"
   echo "     ${B}5${N}  Write an ISO to a USB stick"
@@ -399,6 +436,7 @@ do_step() {  # do_step <function> <title>
   return 0
 }
 
+offer_local_update
 echo "Downloading the config from GitHub ..."
 refresh
 while true; do
@@ -406,7 +444,7 @@ while true; do
   prompt "Choice: "
   case "$REPLY" in
     1) do_step build_all "ISO with all configs"; pause ;;
-    2) do_step choose_config "ISO for one config"; pause ;;
+    2) do_step choose_config "ISO for chosen configs"; pause ;;
     3) do_step build_generic "Generic ISO"; pause ;;
     4) do_step test_in_vm "Test an ISO in a VM"; pause ;;
     5) do_step write_usb "Write an ISO to a USB stick"; pause ;;

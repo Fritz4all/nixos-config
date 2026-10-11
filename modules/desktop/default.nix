@@ -18,7 +18,7 @@
 
   options.my.desktopApps = lib.mkOption {
     type = lib.types.enum [ "full" "minimal" ];
-    default = vars.desktopApps or "full";
+    default = vars.desktopApps or "minimal";
     description = ''
       Which apps come with the desktop. "full": the desktop's usual set of apps.
       "minimal": only what is needed to work (files, terminal, text editor, system tools, viewers).

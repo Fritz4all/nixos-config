@@ -86,7 +86,10 @@ cat > "$DEST/machine.nix" <<EOF
 EOF
 
 echo "Detecting hardware of this machine type (system mounted on $ROOT) ..."
-nixos-generate-config --root "$ROOT" --no-filesystems --show-hardware-config > "$DEST/hardware-configuration.nix"
+# (nixos-generate-config refuses an explicit "--root /", so it is only passed for another root such as /mnt)
+GEN_ARGS=(--no-filesystems --show-hardware-config)
+[[ "$ROOT" != / ]] && GEN_ARGS=(--root "$ROOT" "${GEN_ARGS[@]}")
+nixos-generate-config "${GEN_ARGS[@]}" > "$DEST/hardware-configuration.nix"
 
 # Adds a block of settings to this variant's default.nix (before its final closing brace).
 add_to_host() {  # add_to_host <comment> <settings>
