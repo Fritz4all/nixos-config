@@ -44,7 +44,7 @@ nixos-config/
 ├── modules/         │
 ├── scripts/         ┘
 │
-├── docs/            extra manuals (e.g. how the repo was put on GitHub); not needed for installing
+├── docs/            extra manuals (saving a machine to GitHub, how the repo was put on GitHub)
 ├── .githooks/       blocks commits that contain passwords, keys or tokens (see "Keeping secrets out")
 └── .gitignore       tells Git which files to leave out (build results, test files, secret files)
 ```
@@ -58,6 +58,7 @@ Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 | `modules/apps.nix` | Firefox, Chrome, Brave, Bitwarden, VLC |
 | `modules/commands.nix` | the daily commands `rebuild`, `rebuild-boot`, `nixup`, `versions`, `nixos-release` |
 | `modules/auto-update.nix` | the weekly automatic update (active at the next start) |
+| `modules/logitech.nix` | Solaar for Logitech mice, with the button rules in `modules/logitech/rules.yaml` |
 | `modules/desktop/` | `gnome.nix` and `plasma.nix`, each in a Full and a Minimal version; chosen in `vars.nix` |
 | `hosts/_template/` | template for a new machine |
 | `hosts/<name>/` | one directory per machine (created by the installer): its hardware and `stateVersion` |
@@ -87,7 +88,10 @@ Shared = everything in `vars.nix` and `modules/`. Different per machine = only i
 | `nixos-release` | show or change the NixOS release (see "New NixOS releases") |
 | `sudo nixos-rebuild switch --rollback` | go back to the previous version |
 | `nixos-rebuild list-generations` | list all versions (generations) of the system, with their date; the current one is marked |
-| `nix-shell -p gimp` | use a program temporarily (here GIMP) in this terminal; gone after `exit` or closing the terminal, nothing is installed |
+| `nix run nixpkgs#gimp` | start a program once (here GIMP) without installing it |
+| `nix shell nixpkgs#cowsay` | make a program available only in this terminal session (then e.g. `cowsay hello`) |
+| `nix-shell -p gimp` | the same, older style: use a program temporarily in this terminal; gone after `exit` or closing the terminal |
+| `flatpak install flathub org.gimp.GIMP` | install an app from Flathub (Flatpak); `flatpak list` shows them, `flatpak update` updates them, `flatpak uninstall <app>` removes one |
 | `nix-collect-garbage` | remove downloads that nothing uses any more (e.g. from `nix-shell`); your system and its generations stay |
 
 These are real commands (in `modules/commands/`): they work with and without `sudo` and ask for your password
@@ -112,6 +116,17 @@ Turn it off for one machine with `my.autoUpdate = false;` in `hosts/<name>/defau
 **Adding software:** look up the package at <https://search.nixos.org/packages> and add its name to
 `modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<name>/default.nix` (one machine).
 Then `rebuild`, `git commit` and `git push`.
+
+**Flatpak** is on, with Flathub as the source (<https://flathub.org>). Flatpak apps are installed per machine
+and are not part of the config; they are updated with `flatpak update`. In KDE Plasma (Full) you can also use
+Discover.
+
+**Logitech mice and keyboards:** when the installer finds a Logitech receiver or mouse (Unifying, Bolt,
+Lightspeed), it turns on **Solaar** for that machine (`my.logitech.enable = true;` in `hosts/<name>/default.nix`).
+Solaar starts hidden at login and gets button rules in `~/.config/solaar/rules.yaml`: the **thumb wheel changes
+the volume**. The rules come from `modules/logitech/rules.yaml` and are only copied when the file does not exist
+yet, so changes you make in Solaar's rule editor are kept. A mouse connected only through Bluetooth is not seen
+during installation; add `my.logitech.enable = true;` yourself and run `rebuild`. Log out and in once afterwards.
 
 **Unfree software** (e.g. Google Chrome, Spotify, Steam) is refused unless it is listed in `my.allowedUnfree`, so
 nothing unfree gets in unnoticed. To add one, put its name in that list in `modules/apps.nix` (all machines) or
@@ -252,6 +267,9 @@ these:
 
 If you only change the config elsewhere and push it to GitHub, you can skip this. Note: if you do change files in
 `/etc/nixos` without pushing them, a later `git pull` may ask you to choose between your version and GitHub's.
+
+**Step-by-step guide for beginners, with examples of what you will see and what to do when something goes
+wrong: [docs/save-machine-to-github.md](docs/save-machine-to-github.md).** The short version:
 
 The installer has made you the owner of `/etc/nixos`, so you can edit it without `sudo`.
 In a terminal, logged in as yourself:

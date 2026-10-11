@@ -2,6 +2,7 @@
 # Creates a new machine in this repo: hosts/<hostname>/ with hardware detection and stateVersion.
 # In a virtual machine it also turns on the guest tools for that kind of VM (QEMU/KVM, VMware); NixOS's own
 # hardware detection already handles VirtualBox, Hyper-V and Parallels.
+# With a Logitech receiver or mouse attached it turns on Solaar with the button rules (my.logitech.enable).
 #
 # Usage: bash scripts/new-host.sh <hostname> [--root /mnt]
 #   --root  where the new system is mounted (default /mnt, as in the installer)
@@ -67,25 +68,42 @@ sed "s/@STATE_VERSION@/$STATE_VERSION/" "$REPO/hosts/_template/default.nix" > "$
 echo "Detecting hardware (system mounted on $ROOT) ..."
 nixos-generate-config --root "$ROOT" --show-hardware-config > "$DEST/hardware-configuration.nix"
 
-# Virtual machine? Then add the guest tools for that kind of VM to this machine's settings.
-VIRT="$(systemd-detect-virt --vm 2>/dev/null || true)"
-GUEST=""
-case "$VIRT" in
-  kvm|qemu|bochs)
-    GUEST="  services.qemuGuest.enable = true;       # lets the VM host shut this machine down cleanly
-  services.spice-vdagentd.enable = true;  # shared clipboard; the screen size follows the window" ;;
-  vmware)
-    GUEST="  virtualisation.vmware.guest.enable = true;  # open-vm-tools: clipboard, screen size, drag and drop" ;;
-esac
-if [[ -n "$GUEST" ]]; then
-  # Insert the block before the final closing brace of default.nix
+# Adds a block of settings to this machine's default.nix (before its final closing brace).
+add_to_host() {  # add_to_host <comment> <settings>
   { sed '$d' "$DEST/default.nix"
-    printf '\n  # Virtual machine (%s): guest tools, added by new-host.sh during installation.\n%s\n}\n' "$VIRT" "$GUEST"
+    printf '\n  # %s\n%s\n}\n' "$1" "$2"
   } > "$DEST/default.nix.new"
   mv "$DEST/default.nix.new" "$DEST/default.nix"
-  echo "Virtual machine detected ($VIRT): guest tools are turned on for this machine."
-elif [[ -n "$VIRT" && "$VIRT" != none ]]; then
-  echo "Virtual machine detected ($VIRT): NixOS's hardware detection takes care of the guest tools."
+}
+
+# Virtual machine? Then add the guest tools for that kind of VM to this machine's settings.
+VIRT="$(systemd-detect-virt --vm 2>/dev/null || true)"
+case "$VIRT" in
+  kvm|qemu|bochs)
+    add_to_host "Virtual machine ($VIRT): guest tools, added by new-host.sh during installation." \
+"  services.qemuGuest.enable = true;       # lets the VM host shut this machine down cleanly
+  services.spice-vdagentd.enable = true;  # shared clipboard; the screen size follows the window"
+    echo "Virtual machine detected ($VIRT): guest tools are turned on for this machine." ;;
+  vmware)
+    add_to_host "Virtual machine ($VIRT): guest tools, added by new-host.sh during installation." \
+"  virtualisation.vmware.guest.enable = true;  # open-vm-tools: clipboard, screen size, drag and drop"
+    echo "Virtual machine detected ($VIRT): guest tools are turned on for this machine." ;;
+  ""|none) ;;
+  *) echo "Virtual machine detected ($VIRT): NixOS's hardware detection takes care of the guest tools." ;;
+esac
+
+# Logitech receiver or mouse attached (USB vendor 046d)? Then turn on Solaar with the button rules.
+# (A mouse that is only connected through Bluetooth is not seen here; set my.logitech.enable = true by hand.)
+LOGI=""
+for d in "${USB_SYSFS:-/sys/bus/usb/devices}"/*; do
+  [[ -f "$d/idVendor" && "$(cat "$d/idVendor")" == 046d ]] || continue
+  product="$(cat "$d/product" 2>/dev/null || true)"
+  if [[ "$product" =~ [Rr]eceiver|[Mm]ouse|Unifying|Bolt|Lightspeed|MX ]]; then LOGI="$product"; break; fi
+done
+if [[ -n "$LOGI" ]]; then
+  add_to_host "Logitech device found ($LOGI): Solaar with button rules, added by new-host.sh." \
+"  my.logitech.enable = true;"
+  echo "Logitech device detected ($LOGI): Solaar with the button rules is turned on for this machine."
 fi
 
 trap - ERR

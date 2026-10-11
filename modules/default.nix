@@ -5,6 +5,7 @@
     ./apps.nix
     ./commands.nix
     ./auto-update.nix
+    ./logitech.nix
     ./desktop
   ];
 }
