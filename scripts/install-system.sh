@@ -111,23 +111,25 @@ fi
 
 ##### Offline from the ISO: is really everything there? #####
 
-# Evaluates the system that is going to be installed and asks Nix, without network, whether anything would have
-# to be built or downloaded. Only when nothing is missing, the installation runs without internet.
+# Evaluates the system that is going to be installed (without network) and checks that it is in the ISO's store.
+# Only then the installation runs without internet. (Verified in a VM without network: nixos-install does not take
+# the system from the ISO's store by itself, so it is copied to the new disk before nixos-install runs.)
+NIXF=(nix --extra-experimental-features 'nix-command flakes')
+SYSTEM_PATH=""
 if (( OFFLINE_ISO && ! DRY_RUN && ! CREATE )); then
   echo
   echo "Checking that everything for '$VARIANT' is on the ISO (without network) ..."
-  missing="$(nix --extra-experimental-features 'nix-command flakes' build --offline --dry-run --no-link \
-    "$CFG#nixosConfigurations.$VARIANT.config.system.build.toplevel" 2>&1 || true)"
-  if grep -qE 'will be (built|fetched)|error' <<<"$missing"; then
-    echo "${missing}" | grep -E 'will be|error' | head -n 5 | sed 's/^/  /'
+  SYSTEM_PATH="$("${NIXF[@]}" eval --offline --raw "$CFG#nixosConfigurations.$VARIANT.config.system.build.toplevel.outPath" 2>/dev/null || true)"
+  if [[ -n "$SYSTEM_PATH" ]] && "${NIXF[@]}" path-info --offline "$SYSTEM_PATH" >/dev/null 2>&1; then
+    echo "Everything is on the ISO: the installation needs no internet."
+  else
     warn "Not everything is on the ISO (another username or full name, another release, or a changed config?)."
     OFFLINE_ISO=0
+    SYSTEM_PATH=""
     if ! curl -fsS --max-time 8 -o /dev/null https://cache.nixos.org/nix-cache-info >/dev/null 2>&1; then
       die "The missing parts have to be downloaded, but there is no internet. Connect (step 1), or use the values the ISO was made for."
     fi
     echo "The missing parts are downloaded from the internet."
-  else
-    echo "Everything is on the ISO: the installation needs no internet."
   fi
 fi
 
@@ -191,10 +193,14 @@ fi
 echo "After that you set two passwords: one for root (the administrator account) and one for $USERNAME."
 # --no-root-passwd: the root password is set below, where a typo only means trying again
 # (when nixos-install asks for it itself, a typo makes the whole installation fail).
-# Offline from the ISO: no download sources at all, only the ISO's own store (nixos-install adds it itself)
-OFFLINE_FLAGS=()
-(( OFFLINE_ISO )) && OFFLINE_FLAGS=(--substituters "")
-run nixos-install --no-root-passwd "${OFFLINE_FLAGS[@]}" --flake "$CFG#$VARIANT"
+# Offline from the ISO: first copy the config's sources (nixpkgs) and the complete system from the ISO's store to
+# the new disk; nixos-install then finds everything there and needs no internet.
+if (( OFFLINE_ISO )) && [[ -n "$SYSTEM_PATH" ]]; then
+  echo "Copying the software from the ISO to the new disk ..."
+  run "${NIXF[@]}" flake archive --offline --no-check-sigs --to "$MNT" "$CFG"
+  run "${NIXF[@]}" copy --offline --no-check-sigs --to "$MNT" "$SYSTEM_PATH"
+fi
+run nixos-install --no-root-passwd --flake "$CFG#$VARIANT"
 
 trap - ERR
 
