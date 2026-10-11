@@ -221,7 +221,7 @@ refresh() {
 is_done() {  # is_done <step>
   [[ -n "${DONE[$1]:-}" ]] && return 0
   case "$1" in
-    1) (( ONLINE )) ;;
+    1) (( ONLINE )) || [[ -s "$ISO_MARKER" ]] ;;   # an ISO with the software on it needs no internet
     2) st_disk ;;
     3) st_config ;;
     4) st_config && st_user && st_choice ;;
@@ -233,7 +233,9 @@ is_done() {  # is_done <step>
 detail() {  # short note next to a step
   local src hosts=()
   case "$1" in
-    1) if (( ONLINE )); then echo "connected"; else echo "no connection"; fi ;;
+    1) if (( ONLINE )); then echo "connected"
+       elif [[ -s "$ISO_MARKER" ]]; then echo "no connection (not needed: the software is on this ISO)"
+       else echo "no connection"; fi ;;
     2) if st_disk; then
          src="$(findmnt -no SOURCE "$MNT" 2>/dev/null || true)"
          echo "mounted on $MNT${src:+ ($src)}"
@@ -374,6 +376,11 @@ step_1() {
     return 0
   fi
   echo "${R}No internet connection.${N}"
+  if [[ -s "$ISO_MARKER" ]]; then
+    echo "Not needed for the configs on this ISO: they install without internet ($(paste -sd' ' "$ISO_MARKER"))."
+    echo "Only a new variant (a machine type that is not on the ISO) needs internet."
+    return 0
+  fi
   echo "The installation has to download packages. Plug in a network cable or pick a Wi-Fi network"
   echo "(top right in the live environment, or below with nmtui)."
   if command -v nmtui >/dev/null 2>&1 && ask_yes "Set up Wi-Fi with nmtui?" y; then
