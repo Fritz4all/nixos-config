@@ -11,24 +11,32 @@
       inherit (nixpkgs) lib;
       vars = import ./vars.nix;
 
-      # Every directory in hosts/ is a machine, except directories starting with _ (the template).
-      # Adding a new machine = creating a new directory (see scripts/new-host.sh).
-      hostNames = builtins.attrNames (
+      # Every directory in hosts/ is a config for a machine type and variant (e.g.
+      # lenovo-thinkpad-t14-gen-3-gnome), shared by all machines of that type. Directories starting with _
+      # are templates. The machine names themselves are not in the config (see modules/common.nix).
+      variants = builtins.attrNames (
         lib.filterAttrs
           (name: type: type == "directory" && !(lib.hasPrefix "_" name))
           (builtins.readDir ./hosts)
       );
 
-      mkHost = hostname: lib.nixosSystem {
+      mkVariant = variant: lib.nixosSystem {
         specialArgs = { inherit vars; };
         modules = [
           ./modules
-          ./hosts/${hostname}
-          { networking.hostName = hostname; }
+          ./hosts/${variant}
+          { my.variant = variant; }
         ];
       };
     in
     {
-      nixosConfigurations = lib.genAttrs hostNames mkHost;
+      nixosConfigurations = lib.genAttrs variants mkVariant;
+
+      # Installer ISO with this repo and, for offline installation, the complete systems of the given
+      # variants. Used by build-iso.sh:  (lib.mkIso { variants = [ "..." ]; }).config.system.build.isoImage
+      lib.mkIso = { variants ? [ ], label ? "generic" }: lib.nixosSystem {
+        specialArgs = { inherit self vars variants label; };
+        modules = [ ./iso/installer.nix ];
+      };
     };
 }

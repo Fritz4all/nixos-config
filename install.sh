@@ -46,6 +46,10 @@ if (( EUID != 0 && ! DRY_RUN )); then
   exec sudo bash "$0" "${ORIG_ARGS[@]}"
 fi
 
+# Vendor, model and kind of this computer (scripts/machine-info.sh)
+# shellcheck source=scripts/machine-info.sh
+source "$SELF_REPO/scripts/machine-info.sh"
+
 ##### Styling #####
 
 if [[ -t 1 && "${TERM:-dumb}" != dumb ]]; then
@@ -151,6 +155,13 @@ desk_name() { case "$1" in gnome) echo "GNOME" ;; plasma) echo "KDE Plasma" ;; *
 st_disk()      { mountpoint -q "$MNT" 2>/dev/null && mountpoint -q "$MNT/boot" 2>/dev/null; }
 st_config()    { [[ -f "$CFG/flake.nix" && -f "$CFG/vars.nix" ]]; }
 st_user()      { local u; u="$(var_of username)"; [[ -n "$u" && "$u" != changeme ]]; }
+# Choice from step 4 (config variant and machine name), saved by scripts/settings.sh
+choice_of()    { sed -n "s/^$1=//p" "$CFG/.install-choice" 2>/dev/null | head -n 1; }
+st_choice()    { [[ -n "$(choice_of VARIANT)" && -n "$(choice_of MACHINE_NAME)" ]]; }
+# Started from an ISO made by build-iso.sh? Then it has this repo, and the systems of some configs (offline)
+ISO_MARKER="${ISO_MARKER:-/etc/nixos-config-iso}"
+from_iso()     { [[ -f "$ISO_MARKER" ]]; }
+iso_has()      { from_iso && grep -qx "$1" "$ISO_MARKER"; }
 st_installed() { [[ -L "$MNT/nix/var/nix/profiles/system" ]]; }  # link into /nix/store, hence -L
 
 # Online address of this config: the 'origin' of this copy, else repoUrl in its vars.nix (same as fetch-config.sh).
@@ -205,7 +216,7 @@ is_done() {  # is_done <step>
     1) (( ONLINE )) ;;
     2) st_disk ;;
     3) st_config ;;
-    4) st_config && st_user ;;
+    4) st_config && st_user && st_choice ;;
     5) st_installed ;;
     *) return 1 ;;
   esac
@@ -220,12 +231,9 @@ detail() {  # short note next to a step
          echo "mounted on $MNT${src:+ ($src)}"
        fi ;;
     3) st_config && echo "in $CFG" ;;
-    4) st_config && st_user && echo "$(var_of username) · $(desk_name "$(var_of desktop)") ($(var_of desktopApps)) · NixOS $(release_of)" ;;
+    4) st_config && st_user && st_choice && echo "$(var_of username) · $(choice_of MACHINE_NAME) · $(choice_of VARIANT) · NixOS $(release_of)" ;;
     5) if st_installed; then
-         for d in "$CFG"/hosts/*/; do
-           [[ -d "$d" ]] && [[ "$(basename "$d")" != _* ]] && hosts+=("$(basename "$d")")
-         done
-         echo "installed${hosts[0]:+ (machine: ${hosts[*]})}"
+         echo "installed ($(cat "$MNT/etc/hostname" 2>/dev/null || choice_of MACHINE_NAME), config $(choice_of VARIANT))"
        fi ;;
   esac
   return 0
@@ -243,11 +251,10 @@ next_step() {
 ##### Drawing the menu #####
 
 draw() {
-  local i mark nr ram uefi desk next
+  local i mark nr ram uefi next
   next="$(next_step)"
   ram="$(awk '/MemTotal/ {printf "%.0f GB", $2/1024/1024}' /proc/meminfo 2>/dev/null || true)"
   uefi="no (boot the USB stick in UEFI mode!)"; [[ -d /sys/firmware/efi ]] && uefi="yes"
-  desk="$(var_of desktop)"
 
   clear_screen
   echo "${C}╭────────────────────────────────────────────────────────────╮${N}"
@@ -259,7 +266,13 @@ draw() {
   if (( ${#MISSING_CMDS[@]} > 0 )); then
     printf '  %-11s %s\n' "Tools" "${Y}missing: ${MISSING_CMDS[*]}${N} ${D}(t = install)${N}"
   fi
-  printf '  %-11s %s\n' "Desktop" "${desk:+$(desk_name "$desk")}${desk:-${D}(no config yet)${N}}"
+  printf '  %-11s %s\n' "This PC" "$(machine_vendor) $(machine_model) ($(machine_kind))"
+  if st_choice; then
+    printf '  %-11s %s\n' "Config" "$(choice_of VARIANT) ${D}(machine name: $(choice_of MACHINE_NAME))${N}"
+  fi
+  if from_iso; then
+    printf '  %-11s %s\n' "ISO" "offline packages for: $(paste -sd' ' "$ISO_MARKER")"
+  fi
   [[ -n "$(release_of)" ]] && printf '  %-11s %s\n' "NixOS" "$(release_of)"
   if (( DRY_RUN )); then
     printf '  %-11s %s\n' "Mode" "${Y}DRY RUN${N} – nothing will be changed"
@@ -340,7 +353,13 @@ step_2() {
 
 step_3() {
   require 2 "the disk has not been prepared yet (step 2)." || return 2
-  INSTALL_MENU=1 bash "$SELF_REPO/scripts/fetch-config.sh" --root "$MNT" "${DRY[@]}"
+  if from_iso; then
+    # The ISO has this repo with the matching versions: use that copy (and the packages that are on the ISO)
+    echo "Started from an ISO with this config on it: the config is copied from the ISO."
+    INSTALL_MENU=1 bash "$SELF_REPO/scripts/fetch-config.sh" --root "$MNT" --local --source "$SELF_REPO" --yes "${DRY[@]}"
+  else
+    INSTALL_MENU=1 bash "$SELF_REPO/scripts/fetch-config.sh" --root "$MNT" "${DRY[@]}"
+  fi
 }
 
 step_4() {
@@ -350,7 +369,9 @@ step_4() {
 }
 
 step_5() {
-  require 1 "there is no internet; nixos-install has to download packages (step 1)." || return 2
+  if ! iso_has "$(choice_of VARIANT)"; then
+    require 1 "there is no internet; nixos-install has to download packages (step 1)." || return 2
+  fi
   require 4 "the settings have not been made yet (step 4)." || return 2
   dry_without_config install-system.sh && return 0
   MNT="$MNT" bash "$(script_in_cfg install-system.sh)" --no-reboot "${DRY[@]}"
@@ -383,9 +404,23 @@ show_info() {
       echo
       echo "What is going to be installed (from $CFG):"
       echo "  User:           $(var_of username)"
-      echo "  Desktop:        $(desk_name "$(var_of desktop)") ($(var_of desktopApps))"
+      if st_choice; then
+        local h="$CFG/hosts/$(choice_of VARIANT)/default.nix" d a
+        d="$(sed -n 's/^[[:space:]]*my.desktop[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$h" 2>/dev/null)"
+        a="$(sed -n 's/^[[:space:]]*my.desktopApps[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$h" 2>/dev/null)"
+        [[ -n "$d" ]] || { d="$(choice_of DESKTOP)"; a="$(choice_of APPS)"; }
+        echo "  Machine name:   $(choice_of MACHINE_NAME) (only on this machine)"
+        echo "  Config:         $(choice_of VARIANT)"
+        echo "  Desktop:        $(desk_name "$d") ($a)"
+      else
+        echo "  Config:         not chosen yet (step 4)"
+      fi
       echo "  NixOS release:  $(release_of)"
       echo "  Always:         Firefox, Google Chrome, Brave, Bitwarden, VLC"
+    fi
+    if from_iso; then
+      echo
+      echo "This ISO has everything for offline installation of: $(paste -sd' ' "$ISO_MARKER")"
     fi
   fi
   return 0

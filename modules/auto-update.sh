@@ -5,7 +5,7 @@
 set -euo pipefail
 
 CFG="${NIXOS_CONFIG_DIR:-/etc/nixos}"
-HOST="${AUTO_UPDATE_HOST:?AUTO_UPDATE_HOST is not set}"
+VARIANT="${AUTO_UPDATE_VARIANT:?AUTO_UPDATE_VARIANT is not set}"
 OWNER="$(stat -c %U "$CFG")"
 NIX=(nix --extra-experimental-features 'nix-command flakes')
 
@@ -18,5 +18,5 @@ else
 fi
 
 echo "Building the new system for the next start ..."
-nixos-rebuild boot --flake "path:$CFG#$HOST"
+nixos-rebuild boot --flake "path:$CFG#$VARIANT"
 echo "Done: the update becomes active at the next start."

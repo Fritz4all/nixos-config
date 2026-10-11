@@ -1,7 +1,8 @@
 # Saving a machine's setup to GitHub – step by step
 
-You installed a machine with the installer, and now you want its setup on GitHub: its own settings
-(`hosts/<name>/`), the exact versions (`flake.lock`) and any changes you made. This guide assumes nothing;
+You installed a machine with the installer, and now you want its setup on GitHub: the config of its machine type
+(`hosts/<config>/`, e.g. `hosts/lenovo-thinkpad-t14-gen-3-gnome/`, when step 4 made a new one), the exact versions
+(`flake.lock`) and any changes you made. The machine name is never saved: it stays on the machine. This guide assumes nothing;
 just follow the steps. Back to the [README](../README.md).
 
 > **Is this needed?** No. The machine works fine without it. Do it when you want the same versions on your
@@ -17,7 +18,7 @@ On the installed machine (not in the installer):
 - **GNOME:** press the Super key (Windows key), type `Console` and press Enter.
 - **KDE Plasma:** open the menu at the bottom left, type `Konsole` and press Enter.
 
-The line in the terminal starts with something like `[roy@laptop:~]$`. That is where you type the commands below.
+The line in the terminal starts with something like `[roy@nix-pf3abc12:~]$`. That is where you type the commands below.
 Type each command, then press Enter, and wait until it is finished before typing the next one.
 
 ## Step 2: Go to the config folder
@@ -72,12 +73,15 @@ You see a list, for example:
 ```
 Changes to be committed:
         new file:   flake.lock
-        new file:   hosts/laptop/default.nix
-        new file:   hosts/laptop/hardware-configuration.nix
+        new file:   hosts/README.md
+        new file:   hosts/lenovo-thinkpad-t14-gen-3-gnome/default.nix
+        new file:   hosts/lenovo-thinkpad-t14-gen-3-gnome/hardware-configuration.nix
+        new file:   hosts/lenovo-thinkpad-t14-gen-3-gnome/machine.nix
         modified:   vars.nix
 ```
 
-- `hosts/laptop/` – the settings of this machine (its name is `laptop` here)
+- `hosts/lenovo-thinkpad-t14-gen-3-gnome/` – the new config for this machine type (only when step 4 made a new one)
+- `hosts/README.md` – the overview of all configs that GitHub shows
 - `flake.lock` – the exact versions installed on it
 - `vars.nix` – your username, desktop and the other choices from step 4 of the installer
 
@@ -89,10 +93,12 @@ There are no passwords in these files. A safety check runs anyway in the next st
 git add -A
 ```
 ```bash
-git commit -m "Add machine laptop"
+git commit -m "Add config for Lenovo ThinkPad T14"
 ```
 
-Use your machine's name instead of `laptop`. You see a short summary like `4 files changed`.
+Describe what you add; you see a short summary like `5 files changed`.
+
+Only `flake.lock` changed (you used an existing config)? Then saving is optional: it only records the versions.
 
 **"Commit blocked: the lines above look like passwords, keys or tokens"?** The safety check found something that
 looks secret. Remove it from the file that is mentioned, then do this step again.
@@ -115,7 +121,7 @@ git fetch origin
 git reset --soft origin/main
 ```
 ```bash
-git commit -m "Add machine laptop"
+git commit -m "Add config for Lenovo ThinkPad T14"
 ```
 ```bash
 git push -u origin main
@@ -125,7 +131,7 @@ git push -u origin main
 
 ## Step 8: Check on GitHub
 
-Open <https://github.com/Fritz4all/nixos-config> and click the folder **hosts**: your machine is there.
+Open <https://github.com/Fritz4all/nixos-config> and click the folder **hosts**: the table shows your config.
 
 ---
 

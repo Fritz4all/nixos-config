@@ -25,3 +25,6 @@ dev/
 
 # Notes for the AI assistant (Claude Code); kept locally only.
 CLAUDE.md
+
+# The choices of step 4 of the installer (machine name etc.); stays on the machine.
+.install-choice

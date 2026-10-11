@@ -20,7 +20,7 @@
       after = [ "network-online.target" ];
       restartIfChanged = false;   # never interrupt a running update when the system is rebuilt
       environment = config.nix.envVars // {
-        AUTO_UPDATE_HOST = config.networking.hostName;
+        AUTO_UPDATE_VARIANT = config.my.variant;
       };
       path = [
         config.nix.package

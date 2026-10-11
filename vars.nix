@@ -11,13 +11,10 @@
   #   repoUrl = "https://github.com/YOURNAME/nixos-config.git";
   repoUrl = "https://github.com/Fritz4all/nixos-config.git";
 
-  # Desktop environment: "gnome" or "plasma" (KDE Plasma).
-  # Switching = change it here (all machines) or per machine in hosts/<name>/default.nix
-  # with `my.desktop = "plasma";`. Then rebuild and reboot.
+  # Default desktop for a NEW variant: "gnome" or "plasma" (KDE Plasma), and its apps: "full" (the desktop's
+  # usual set of apps) or "minimal" (only what you need to work). Each variant in hosts/<variant>/default.nix
+  # sets its own my.desktop and my.desktopApps; the installer asks for them when it creates a variant.
   desktop = "gnome";
-
-  # Which apps come with the desktop: "full" (the desktop's usual set of apps) or "minimal" (only what you
-  # need to work: files, terminal, text editor, ...). Per machine: `my.desktopApps = "minimal";`.
   desktopApps = "full";
 
   # Time, language and region

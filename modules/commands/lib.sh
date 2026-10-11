@@ -6,6 +6,9 @@ set -euo pipefail
 CFG="${NIXOS_CONFIG_DIR:-/etc/nixos}"
 [[ -d "$CFG" ]] || { echo "ERROR: $CFG not found (this command is for an installed NixOS system)." >&2; exit 1; }
 OWNER="$(stat -c %U "$CFG")"
+# Which config in hosts/ this machine uses (written by the config itself, see modules/common.nix)
+VARIANT="$(cat "${NIXOS_VARIANT_FILE:-/etc/nixos-variant}" 2>/dev/null || true)"
+[[ -n "$VARIANT" ]] || VARIANT="$(cat /proc/sys/kernel/hostname 2>/dev/null || hostname)"  # older installations
 
 # Runs a command as the owner of the config directory.
 as_owner() {
@@ -23,9 +26,9 @@ rebuild_with() {
   local mode="$1"
   shift
   if [[ "$OWNER" == root ]]; then
-    as_owner nixos-rebuild "$mode" --flake "$CFG" "$@"
+    as_owner nixos-rebuild "$mode" --flake "$CFG#$VARIANT" "$@"
   else
     # Build as the owner; only the activation runs with sudo.
-    as_owner nixos-rebuild "$mode" --flake "$CFG" --sudo "$@"
+    as_owner nixos-rebuild "$mode" --flake "$CFG#$VARIANT" --sudo "$@"
   fi
 }

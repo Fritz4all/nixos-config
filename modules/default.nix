@@ -2,6 +2,7 @@
 {
   imports = [
     ./common.nix
+    ./disk.nix
     ./apps.nix
     ./commands.nix
     ./auto-update.nix

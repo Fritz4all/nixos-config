@@ -22,6 +22,7 @@ Installing a machine comes down to: boot the NixOS installer, get this folder, r
   - [2.5 Optional: save the new machine to GitHub](#25-optional-save-the-new-machine-to-github)
 - [Adding another machine](#adding-another-machine)
 - [Desktop: GNOME or KDE Plasma, Full or Minimal](#desktop-gnome-or-kde-plasma-full-or-minimal)
+- [Building your own ISO](#building-your-own-iso)
 - [Keeping secrets out](#keeping-secrets-out)
 - [New NixOS releases](#new-nixos-releases)
 - [Troubleshooting](#troubleshooting)
@@ -37,12 +38,14 @@ Installing a machine comes down to: boot the NixOS installer, get this folder, r
 nixos-config/
 ├── README.md        this guide
 ├── install.sh       THE INSTALLER: start this in the NixOS live system
+├── build-iso.sh     builds your own installer ISO (run it on your own computer, see "Building your own ISO")
 ├── flake.nix        ┐
 ├── flake.lock       │  THE CONFIGURATION AND THE INSTALLER
 ├── vars.nix         │  Needed on GitHub and on the USB stick.
 ├── hosts/           │  (flake.lock appears after the first installation)
 ├── modules/         │
-├── scripts/         ┘
+├── scripts/         │
+├── iso/             ┘
 │
 ├── docs/            extra manuals (saving a machine to GitHub, how the repo was put on GitHub)
 ├── .githooks/       blocks commits that contain passwords, keys or tokens (see "Keeping secrets out")
@@ -53,27 +56,34 @@ Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 
 | Part | What it is |
 |---|---|
-| `vars.nix` | your choices: username, desktop and its apps (Full/Minimal), language, time zone, keyboard, GitHub address (`repoUrl`) |
+| `vars.nix` | shared choices: username, language, time zone, keyboard, GitHub address (`repoUrl`), and the default desktop for new configs |
 | `modules/common.nix` | basics for every machine: boot, network, sound, printing, Bluetooth, user, basic programs |
 | `modules/apps.nix` | Firefox, Chrome, Brave, Bitwarden, VLC |
 | `modules/commands.nix` | the daily commands `rebuild`, `rebuild-boot`, `nixup`, `versions`, `nixos-release` |
 | `modules/auto-update.nix` | the weekly automatic update (active at the next start) |
 | `modules/logitech.nix` | Solaar for Logitech mice, with the button rules in `modules/logitech/rules.yaml` |
-| `modules/desktop/` | `gnome.nix` and `plasma.nix`, each in a Full and a Minimal version; chosen in `vars.nix` |
-| `hosts/_template/` | template for a new machine |
-| `hosts/<name>/` | one directory per machine (created by the installer): its hardware and `stateVersion` |
-| `flake.nix` | sets the NixOS release and turns every directory in `hosts/` into a machine automatically |
+| `modules/desktop/` | `gnome.nix` and `plasma.nix`, each in a Full and a Minimal version; chosen per config |
+| `modules/disk.nix` | finds the disks by name (not by disk ID), so one config works on every machine of a type |
+| `hosts/<config>/` | **one config per machine type and variant**, e.g. `lenovo-thinkpad-t14-gen-3-gnome`: hardware of that type, vendor/model (`machine.nix`), desktop, apps, disk encryption. Shared by every machine of that type; made by the installer |
+| `hosts/README.md` | table of all configs (vendor, model, desktop, …), shown by GitHub when you open the `hosts` folder |
+| `hosts/_template/` | template for a new config |
+| `flake.nix` | sets the NixOS release and turns every directory in `hosts/` into a config automatically |
 | `flake.lock` | records the exact versions, so all machines get the same software |
 | `install.sh` | **the installer**: a menu that runs the steps below in the right order |
 | `scripts/prepare-disk.sh` | choose, partition, encrypt and mount the disk |
 | `scripts/fetch-config.sh` | put the config on the new disk: download from GitHub, or copy locally |
-| `scripts/settings.sh` | step 4: ask for your username, full name, desktop, Full/Minimal apps and NixOS release |
+| `scripts/settings.sh` | step 4: username, the config for this machine (recognised by vendor and model), machine name, NixOS release |
 | `scripts/release.sh` | show the available NixOS releases and choose one (later also as the command `nixos-release`) |
-| `scripts/install-system.sh` | step 5: ask for the machine name, run `nixos-install`, set the passwords, show the versions |
-| `scripts/new-host.sh` | create `hosts/<name>/` (used by `install-system.sh`) |
+| `scripts/install-system.sh` | step 5: make a new config if needed, run `nixos-install`, write the machine name, set the passwords, show the versions |
+| `scripts/new-host.sh` | create a config `hosts/<config>/` (used by `install-system.sh`) |
+| `scripts/machine-info.sh` | reads vendor, model, kind and serial number from the firmware |
+| `scripts/hosts-overview.sh` | writes `hosts/README.md` and lists the configs for the installer and `build-iso.sh` |
+| `build-iso.sh` + `iso/installer.nix` | build your own installer ISO with the config (and optionally all software) on it |
 | `scripts/versions.sh` | show the versions of the system and your programs (later also as the command `versions`) |
 
-Shared = everything in `vars.nix` and `modules/`. Different per machine = only its directory in `hosts/`.
+Shared = everything in `vars.nix` and `modules/`. Per machine **type** = its config in `hosts/`. Per **machine** =
+only its name, which stays on the machine itself (in `/etc/hostname`, never in Git): ten laptops of the same model
+share one config, and nothing about them has to be added to GitHub.
 
 ---
 
@@ -87,6 +97,7 @@ Shared = everything in `vars.nix` and `modules/`. Different per machine = only i
 | `versions` | show the versions of NixOS, kernel, desktop and your programs |
 | `nixos-release` | show or change the NixOS release (see "New NixOS releases") |
 | `sudo nixos-rebuild switch --rollback` | go back to the previous version |
+| `sudo hostnamectl set-hostname <name>` | change the name of this machine (it is only stored on the machine) |
 | `nixos-rebuild list-generations` | list all versions (generations) of the system, with their date; the current one is marked |
 | `nix run nixpkgs#gimp` | start a program once (here GIMP) without installing it |
 | `nix shell nixpkgs#cowsay` | make a program available only in this terminal session (then e.g. `cowsay hello`) |
@@ -111,10 +122,10 @@ with `git commit -am "Update software" && git push` if you want your other machi
 | `journalctl -u nixos-auto-update` | what the last automatic update did |
 | `sudo systemctl start nixos-auto-update` | run the automatic update now |
 
-Turn it off for one machine with `my.autoUpdate = false;` in `hosts/<name>/default.nix` (then `rebuild`).
+Turn it off for one config with `my.autoUpdate = false;` in `hosts/<config>/default.nix` (then `rebuild`).
 
 **Adding software:** look up the package at <https://search.nixos.org/packages> and add its name to
-`modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<name>/default.nix` (one machine).
+`modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<config>/default.nix` (all machines with that config).
 Then `rebuild`, `git commit` and `git push`.
 
 **Flatpak** is on, with Flathub as the source (<https://flathub.org>). Flatpak apps are installed per machine
@@ -122,7 +133,7 @@ and are not part of the config; they are updated with `flatpak update`. In KDE P
 Discover.
 
 **Logitech mice and keyboards:** when the installer finds a Logitech receiver or mouse (Unifying, Bolt,
-Lightspeed), it turns on **Solaar** for that machine (`my.logitech.enable = true;` in `hosts/<name>/default.nix`).
+Lightspeed), it turns on **Solaar** in that config (`my.logitech.enable = true;` in `hosts/<config>/default.nix`).
 Solaar starts hidden at login and gets button rules in `~/.config/solaar/rules.yaml`: the **thumb wheel changes
 the volume**. The rules come from `modules/logitech/rules.yaml` and are only copied when the file does not exist
 yet, so changes you make in Solaar's rule editor are kept. A mouse connected only through Bluetooth is not seen
@@ -130,7 +141,7 @@ during installation; add `my.logitech.enable = true;` yourself and run `rebuild`
 
 **Unfree software** (e.g. Google Chrome, Spotify, Steam) is refused unless it is listed in `my.allowedUnfree`, so
 nothing unfree gets in unnoticed. To add one, put its name in that list in `modules/apps.nix` (all machines) or
-add `my.allowedUnfree = [ "spotify" ];` to `hosts/<name>/default.nix` (one machine). Firmware and CPU microcode
+add `my.allowedUnfree = [ "spotify" ];` to `hosts/<config>/default.nix` (one config). Firmware and CPU microcode
 are always allowed.
 
 **Trying software temporarily** (nothing is installed, no new generation): `nix run nixpkgs#gimp` starts it once,
@@ -245,8 +256,8 @@ What each step does:
 | 1. Internet connection | Checks internet and whether your repo can be downloaded (the **Repo** line). No internet? It offers to set up Wi-Fi with `nmtui`. |
 | 2. Prepare disk | Lists the disks (number, size, SSD/HDD, connection, model). The USB stick you booted from cannot be chosen. You type the disk's name to confirm, choose encryption (recommended, default yes) and type a passphrase twice (a typo? you simply get to try again). Creates an EFI partition of 1 GiB and a system partition with the rest, and mounts them on `/mnt`. **Everything on that disk is erased.** |
 | 3. Fetch config | Puts the config in `/mnt/etc/nixos`. **Download config** (git clone from GitHub) when the repo can be downloaded, otherwise **Local config** (a copy of the folder from 2.3). It always says which one and why, and you can override it (`1` or `2`). |
-| 4. Settings | Asks for your username, full name, **desktop** (1 = GNOME, 2 = KDE Plasma), the **apps** that come with it (1 = Full, 2 = Minimal; see below) and the **NixOS release**. The releases are looked up online, so new releases appear by themselves; the newest stable one is marked as recommended, and `unstable` is offered for the newest software. Enter keeps the current value each time. |
-| 5. Install | Asks for the machine name (e.g. `laptop`), detects the hardware (in a virtual machine it also turns on the guest tools: shared clipboard and a screen that follows the window size), runs `nixos-install` (10 to 30 minutes), then asks for a root password and your user password (each typed twice; a typo means you simply try again), and shows the versions. |
+| 4. Settings | Asks for your username and full name. Then it **recognises the machine type** (vendor and model, e.g. Lenovo ThinkPad T14 Gen 3) and shows **every config of that type** (e.g. a GNOME and a KDE Plasma variant); choose one, or make a **new variant** (then you choose the **desktop**, 1 = GNOME / 2 = KDE Plasma, and its **apps**, 1 = Full / 2 = Minimal, see below). Configs that do not fit the disk (encrypted or not) are shown but cannot be chosen. Then the **machine name**: the suggestion is `nix-<serial number>`, Enter takes it, or type another; it stays on this machine only. Last the **NixOS release** (looked up online; the newest stable one is recommended, `unstable` gives the newest software). Enter keeps the current value each time. |
+| 5. Install | For a new variant it detects the hardware of this type and creates the config (in a virtual machine it also turns on the guest tools: shared clipboard and a screen that follows the window size); an existing config is used as it is. It runs `nixos-install` (10 to 30 minutes; a few minutes from your own ISO), writes the machine name to `/etc/hostname`, then asks for a root password and your user password (each typed twice; a typo means you simply try again), and shows the versions. |
 | 6. Reboot | Remove the USB sticks. With encryption you first type the passphrase, then the login screen appears. |
 
 Your Wi-Fi password is not copied from the live environment; enter it again after the first start.
@@ -256,12 +267,13 @@ name. If you repartitioned the disk, choose **2 (Recreate)**; the script stops b
 configuration does not match the mounted disk.
 
 ### 2.5 Optional: save the new machine to GitHub
-**Not needed for the machine to work.** Your new NixOS runs fine without this step. Do it when you want one of
-these:
+**Not needed for the machine to work.** Your new NixOS runs fine without this step. When you made a **new config**
+in step 4 (a new machine type or variant), save it, so your next machines of that type can use it. The machine
+name is never saved. Do it when you want one of these:
 
 - **The same versions on your next machines:** the installation created `flake.lock` with the exact versions;
   without it, each new machine simply gets the newest versions at that moment.
-- **A backup of this machine's own settings** in `hosts/<name>/` (e.g. an extra program or another desktop);
+- **A backup of this machine type's config** in `hosts/<config>/` (e.g. an extra program or another desktop);
   without it, a reinstallation just creates that directory again.
 - **Changes you make on this machine** (in `/etc/nixos`) **shared with your other machines** via `git pull`.
 
@@ -284,7 +296,7 @@ gh auth login
 Then, **if step 3 used Download config**:
 ```bash
 git add -A
-git commit -m "Add machine laptop"
+git commit -m "Add config for Lenovo ThinkPad T14"
 git push
 ```
 
@@ -293,7 +305,7 @@ git push
 git fetch origin
 git reset --soft origin/main
 git add -A
-git commit -m "Add machine laptop"
+git commit -m "Add config for Lenovo ThinkPad T14"
 git push -u origin main
 ```
 (No `origin` yet? Add it first: `git remote add origin https://github.com/Fritz4all/nixos-config.git`.)
@@ -304,7 +316,15 @@ From now on you change the config in `/etc/nixos` and apply it with `rebuild`.
 
 ## Adding another machine
 
-Same recipe as Part 2, with a **new, unique name** in step 5 (e.g. `workpc`). Optionally save it (2.5).
+Same recipe as Part 2. In step 4:
+
+- **Same type as a machine you installed before** (and saved, 2.5): the installer shows its configs; choose one.
+  Nothing new is added to GitHub; only the machine name (e.g. `nix-<serial number>`) is new, and that stays on
+  the machine.
+- **A new machine type, or another desktop for a type:** choose "New variant"; save it afterwards (2.5).
+- **Many machines of one type at once:** build an ISO for that type (see "Building your own ISO"): then each
+  installation takes minutes and needs no internet.
+
 Tip: first update the versions on an existing machine, so the new machine gets fresh packages
 (see "Google Chrome cannot be downloaded" below):
 ```bash
@@ -326,15 +346,67 @@ two versions (chosen in step 4 of the menu):
 
 To switch later:
 
-1. For all machines: set `desktop = "plasma";` (or `"gnome"`) and/or `desktopApps = "minimal";` (or `"full"`)
-   in `vars.nix`. For one machine: add `my.desktop = "plasma";` and/or `my.desktopApps = "minimal";` to
-   `hosts/<name>/default.nix`.
+1. In the config of the machine (`hosts/<config>/default.nix`), change `my.desktop = "plasma";` (or `"gnome"`)
+   and/or `my.desktopApps = "minimal";` (or `"full"`). This changes it for every machine with that config;
+   for one machine only, make a new variant instead. (`desktop` in `vars.nix` is only the default for new configs.)
 2. Apply and reboot (`boot` is safer than `switch` when the login manager changes):
    ```bash
    rebuild-boot
    reboot
    ```
 Your own apps (Firefox, Chrome, …) stay the same. The settings of each desktop are stored separately in your home folder.
+
+---
+
+## Building your own ISO
+
+`build-iso.sh` builds your own installer ISO from what is on GitHub. Booting it, the installer starts by
+itself; on a machine whose type is on the ISO, step 4 offers those configs and the installation needs **no
+internet** and takes minutes. Run it on your own computer (e.g. Ubuntu), as yourself:
+
+```bash
+bash build-iso.sh
+```
+
+```
+╭────────────────────────────────────────────────────────────╮
+│               Build an ISO  ·  nixos-config                │
+╰────────────────────────────────────────────────────────────╯
+  Nix         2.34.8
+  GitHub      main @ 1a2b3c4 … (3 configs, NixOS 26.05)
+  Local repo  everything is on GitHub
+  Free space  390G (ISOs go to ~/ISOs)
+
+     1  ISO with all configs (3)        every config, installable offline
+     2  ISO for one config               choose a machine type and variant
+     3  Generic ISO                      installer + config, for new machine types
+     4  Test an ISO in a VM              without network: is it really offline?
+     5  Write an ISO to a USB stick
+```
+
+| Choice | What it does |
+|---|---|
+| 1. All configs | one ISO with every config in `hosts/`; all of them install offline |
+| 2. One config | the configs are listed per machine type; choose one, or **a** = all variants of one type (e.g. GNOME and Plasma of the T14) |
+| 3. Generic | only the installer and the config: small, for machine types that are not on GitHub yet (installing needs internet) |
+| 4. Test in a VM | starts an ISO in virt-manager **without network**, so you see whether the offline installation really works |
+| 5. USB stick | only USB sticks are offered (never your internal disk); you confirm by typing the stick's name |
+| i | Nix version, free space, the ISOs you built, and moving old ones to the trash |
+
+Good to know:
+
+- **Always what is on GitHub:** the repo is downloaded fresh before each build. Changes you did not push are not
+  on the ISO; the menu warns about them ("Local repo").
+- **Nix is needed.** If it is not installed, the script asks whether it may install it (the official installer
+  from nixos.org; it asks for your sudo password).
+- **Size and time:** before building it shows how much is downloaded; an ISO with all software is roughly 5 to 8 GB
+  and takes 20 to 40 minutes the first time. ISOs go to `~/ISOs`, with a `.sha256` checksum next to them.
+- **Same versions:** the ISO contains the versions of the moment you built it (GitHub's `flake.lock` if there is
+  one). After installing, the weekly automatic update brings them up to date. Rebuild the ISO now and then.
+- **Offline needs the same username** as in `vars.nix` on GitHub; with another username the installation
+  downloads the parts that differ.
+- **Google Chrome:** its license does not allow sharing it, so an ISO with Chrome is for **your own use** only.
+  Do not put it on GitHub or a public website.
 
 ---
 
@@ -383,7 +455,7 @@ within that month:
    cd /etc/nixos && git commit -am "Upgrade NixOS" && git push
    ```
 
-Never change `system.stateVersion` in `hosts/<name>/`: it stays the release the machine was first installed
+Never change `system.stateVersion` in `hosts/<config>/`: it stays the release the config was first installed
 with. If something does not work after an upgrade, choose the previous version in the boot menu.
 
 ---

@@ -2,6 +2,18 @@
 { config, lib, pkgs, vars, ... }:
 
 {
+  options.my.variant = lib.mkOption {
+    type = lib.types.str;
+    description = "Name of this config in hosts/ (machine type + variant); set by flake.nix.";
+  };
+
+  options.my.machine = lib.mkOption {
+    type = lib.types.attrsOf lib.types.str;
+    default = { };
+    example = { vendor = "Lenovo"; model = "ThinkPad T14 Gen 3"; kind = "Laptop"; };
+    description = "Machine type of this config (from hosts/<variant>/machine.nix), used by the installer to recognise it.";
+  };
+
   options.my.allowedUnfree = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     default = [ ];
@@ -40,7 +52,13 @@
 
     ##### Network #####
     networking.networkmanager.enable = true;
-    # The firewall is on by default. The hostname comes from the directory name in hosts/.
+    # The machine name is not in the config (several machines share one config): the installer writes it to
+    # /etc/hostname on the machine itself. Change it later with: sudo hostnamectl set-hostname <name>
+    networking.hostName = lib.mkDefault "";
+    # Which config in hosts/ this machine uses; read by rebuild, nixup and the automatic update
+    environment.etc."nixos-variant".text = config.my.variant;
+    system.name = config.my.variant;   # name of the system in Nix (otherwise "unnamed" without a hostname)
+    # The firewall is on by default.
 
     ##### Time, language and keyboard (settings are in vars.nix) #####
     time.timeZone = vars.timeZone;
