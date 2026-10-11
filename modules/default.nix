@@ -4,6 +4,7 @@
     ./common.nix
     ./apps.nix
     ./commands.nix
+    ./auto-update.nix
     ./desktop
   ];
 }

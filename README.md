@@ -56,6 +56,8 @@ Everything you need is on GitHub; Part 1 explains how to put it on a USB stick.
 | `vars.nix` | your choices: username, desktop and its apps (Full/Minimal), language, time zone, keyboard, GitHub address (`repoUrl`) |
 | `modules/common.nix` | basics for every machine: boot, network, sound, printing, Bluetooth, user, basic programs |
 | `modules/apps.nix` | Firefox, Chrome, Brave, Bitwarden, VLC |
+| `modules/commands.nix` | the daily commands `rebuild`, `rebuild-boot`, `nixup`, `versions`, `nixos-release` |
+| `modules/auto-update.nix` | the weekly automatic update (active at the next start) |
 | `modules/desktop/` | `gnome.nix` and `plasma.nix`, each in a Full and a Minimal version; chosen in `vars.nix` |
 | `hosts/_template/` | template for a new machine |
 | `hosts/<name>/` | one directory per machine (created by the installer): its hardware and `stateVersion` |
@@ -92,6 +94,20 @@ These are real commands (in `modules/commands/`): they work with and without `su
 when needed. They build as the owner of `/etc/nixos` and only use administrator rights to activate.
 
 Something broken after an update? Choose an older version in the boot menu.
+
+**Automatic updates:** once a week every machine fetches and builds the newest versions within its NixOS release
+by itself (at a random moment within an hour; if the computer was off, it catches up at the next start). The
+update becomes active **at the next start**, so nothing changes while you work, and there is never an automatic
+reboot. The previous version stays in the boot menu. `flake.lock` in `/etc/nixos` is updated as well; save it
+with `git commit -am "Update software" && git push` if you want your other machines on the same versions.
+
+| Command | What it does |
+|---|---|
+| `systemctl list-timers nixos-auto-update` | when the next automatic update runs |
+| `journalctl -u nixos-auto-update` | what the last automatic update did |
+| `sudo systemctl start nixos-auto-update` | run the automatic update now |
+
+Turn it off for one machine with `my.autoUpdate = false;` in `hosts/<name>/default.nix` (then `rebuild`).
 
 **Adding software:** look up the package at <https://search.nixos.org/packages> and add its name to
 `modules/apps.nix` (all machines) or to `environment.systemPackages` in `hosts/<name>/default.nix` (one machine).
