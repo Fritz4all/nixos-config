@@ -33,6 +33,20 @@ for arg in "$@"; do
   esac
 done
 
+# Mounts with an explicit file system type, retrying a few times: right after formatting, udev may still be
+# busy and `mount` without a type may not recognise the new file system yet (seen in a VM: it then tried FAT
+# and ISO9660 on the new ext4 partition and failed with "wrong fs type"). With -t the kernel loads ext4 itself.
+mount_retry() {  # mount_retry <type> <device> <dir> [options]
+  local i
+  for i in 1 2 3 4 5; do
+    udevadm settle 2>/dev/null || true
+    if mount -t "$1" ${4:+-o "$4"} "$2" "$3"; then return 0; fi
+    echo "Mounting $2 did not work yet; trying again ($i/5) ..."
+    sleep 2
+  done
+  return 1
+}
+
 # Asks "Try again?" after a failed attempt (e.g. a typo in a passphrase). Exit code 0 = try again.
 try_again() {
   local again
@@ -206,9 +220,10 @@ run mkfs.ext4 -F -L nixos "$ROOT_DEV"
 
 echo
 echo "Mounting on $MNT ..."
-run mount "$ROOT_DEV" "$MNT"
+run udevadm settle
+run mount_retry ext4 "$ROOT_DEV" "$MNT" || die "Mounting $ROOT_DEV on $MNT failed. Run this step again."
 run mkdir -p "$MNT/boot"
-run mount -o umask=077 "$P1" "$MNT/boot"
+run mount_retry vfat "$P1" "$MNT/boot" umask=077 || die "Mounting $P1 on $MNT/boot failed. Run this step again."
 
 trap - ERR
 
