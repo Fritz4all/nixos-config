@@ -68,8 +68,8 @@ find_nix() {
     NIX=("$NIX_PORTABLE" nix --extra-experimental-features 'nix-command flakes')
   elif command -v nix >/dev/null 2>&1; then
     NIX=(nix --extra-experimental-features 'nix-command flakes')
-  elif [[ -x /nix/var/nix/profiles/default/bin/nix ]]; then
-    NIX=(/nix/var/nix/profiles/default/bin/nix --extra-experimental-features 'nix-command flakes')
+  elif [[ -x "${NIX_DEFAULT_BIN:-/nix/var/nix/profiles/default/bin/nix}" ]]; then
+    NIX=("${NIX_DEFAULT_BIN:-/nix/var/nix/profiles/default/bin/nix}" --extra-experimental-features 'nix-command flakes')
   fi
   (( ${#NIX[@]} ))
 }
