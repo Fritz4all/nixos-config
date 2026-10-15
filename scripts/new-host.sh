@@ -186,7 +186,7 @@ for d in "${PCI_SYSFS:-/sys/bus/pci/devices}"/*; do
   esac
 done
 gpu_name() {  # readable name via lspci when available
-  command -v lspci >/dev/null 2>&1 && lspci -s "$1" 2>/dev/null | sed 's/^[^:]*: *//; s/^[^:]*: *//' | head -n 1
+  command -v lspci >/dev/null 2>&1 && lspci -s "$1" 2>/dev/null | sed -E 's/^[^ ]+ [^:]*: *//' | head -n 1  # drop "<address> <class>: "
   return 0
 }
 if [[ -n "$INTEL_GPU" ]]; then
